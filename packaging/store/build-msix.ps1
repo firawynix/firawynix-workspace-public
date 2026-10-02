@@ -2,12 +2,11 @@
 .SYNOPSIS
   Empacota Monitor, IDE e FirawMerge em um MSIX x64 para a Microsoft Store.
 .DESCRIPTION
-  Use os valores Package/Identity Name e Publisher do Partner Center para a
-  submissão final. Sem eles, os valores padrão geram somente uma prévia local.
+  Usa a identidade oficial do Firawynix Workspace reservada no Partner Center.
 #>
 [CmdletBinding()]
 param(
-    [string]$IdentityName = 'Firawynix.Workspace.Preview',
+    [string]$IdentityName = 'Firawynix.FirawynixWorkspace',
     [string]$Publisher = 'CN=1FDE3668-C222-4506-AFE6-E2E425EAECD8',
     [string]$Version = '0.1.0.0',
     [string]$MonitorExe = '',
@@ -72,4 +71,4 @@ $hash = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash
 Write-Output "MSIX=$package"
 Write-Output "SHA256=$hash"
 Write-Output "IDENTITY=$IdentityName"
-if ($IdentityName.EndsWith('.Preview')) { Write-Warning 'Identidade provisória: reserve o nome no Partner Center e gere o MSIX final com os valores oficiais.' }
+if ($IdentityName.EndsWith('.Preview')) { Write-Warning 'Identidade provisória: gere o MSIX final com os valores oficiais do Partner Center.' }
