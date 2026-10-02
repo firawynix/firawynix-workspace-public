@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Empacota o Monitor ou a IDE em um MSIX x64 independente para a Microsoft Store.
+  Empacota o Monitor, a IDE ou o Strigoi em um MSIX x64 independente para a Microsoft Store.
 .DESCRIPTION
   Não inicia o aplicativo e não faz conexões SSH. Usa as identidades oficiais
   reservadas no Partner Center para cada produto.
@@ -8,17 +8,21 @@
   powershell -NoProfile -ExecutionPolicy Bypass -File packaging/store/build-standalone-msix.ps1 -Product Monitor
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File packaging/store/build-standalone-msix.ps1 -Product IDE -IdentityName Firawynix.FirawIDE
+.EXAMPLE
+  powershell -NoProfile -ExecutionPolicy Bypass -File packaging/store/build-standalone-msix.ps1 -Product Strigoi -StrigoiDir 'C:\Users\Hugo\Strigoi - Store\original'
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Monitor', 'IDE')]
+    [ValidateSet('Monitor', 'IDE', 'Strigoi')]
     [string]$Product,
     [string]$IdentityName = '',
     [string]$Publisher = 'CN=1FDE3668-C222-4506-AFE6-E2E425EAECD8',
-    [string]$Version = '0.1.0.0',
+    [string]$Version = '',
     [string]$MonitorExe = '',
-    [string]$IdeDir = ''
+    [string]$IdeDir = '',
+    [string]$StrigoiDir = '',
+    [string]$StrigoiIcon = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,11 +44,25 @@ $products = @{
         PackageName = 'FirawIDE'
         Icon = 'modules\ide\build\strigoi-icon.png'
     }
+    Strigoi = @{
+        Identity = 'Firawynix.strigoi'
+        AppId = 'Strigoi'
+        DisplayName = 'strigoi'
+        Description = 'Ambiente local para conversa, planejamento e desenvolvimento com IA opcional'
+        PackageName = 'Strigoi'
+        Icon = ''
+    }
 }
 $settings = $products[$Product]
 if (-not $IdentityName) { $IdentityName = $settings.Identity }
+if (-not $Version) { $Version = if ($Product -eq 'Strigoi') { '0.1.17.0' } else { '0.1.0.0' } }
 if (-not $MonitorExe) { $MonitorExe = Join-Path $workspace 'modules\monitor\dist\FirawynixMonitor.exe' }
 if (-not $IdeDir) { $IdeDir = Join-Path $workspace 'modules\ide\dist\win-unpacked' }
+if ($Product -eq 'Strigoi') {
+    if (-not $StrigoiDir) { throw 'Informe -StrigoiDir com a distribuição original extraída do instalador Strigoi.' }
+    $StrigoiDir = (Resolve-Path -LiteralPath $StrigoiDir).Path
+    if (-not $StrigoiIcon) { $StrigoiIcon = Join-Path $StrigoiDir 'resources\app\electron-app\resources\strigoi-icon.png' }
+}
 
 if ($IdentityName -notmatch '^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$') { throw 'IdentityName inválido.' }
 if ($Publisher -notmatch '^CN=.+') { throw 'Publisher inválido.' }
@@ -54,6 +72,19 @@ if ($Product -eq 'Monitor' -and -not (Test-Path -LiteralPath $MonitorExe -PathTy
 }
 if ($Product -eq 'IDE' -and -not (Test-Path -LiteralPath (Join-Path $IdeDir 'Strigoi.exe') -PathType Leaf)) {
     throw "Executável da IDE ausente: $IdeDir\Strigoi.exe"
+}
+if ($Product -eq 'Strigoi' -and -not (Test-Path -LiteralPath (Join-Path $StrigoiDir 'Strigoi.exe') -PathType Leaf)) {
+    throw "Executável do Strigoi ausente: $StrigoiDir\Strigoi.exe"
+}
+if ($Product -eq 'Strigoi') {
+    $splash = Join-Path $StrigoiDir 'resources\app\electron-app\resources\splash.html'
+    $theme = Join-Path $StrigoiDir 'resources\app\plugins\strigoi.astra-theme\package.json'
+    if (-not (Test-Path -LiteralPath $splash -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $theme -PathType Leaf) -or
+        (Get-Content -LiteralPath $splash -Raw) -notmatch 'strigoi-mascot-v1\.png' -or
+        (Get-Content -LiteralPath $theme -Raw) -notmatch 'Strigoi Astra') {
+        throw 'A distribuição informada não corresponde à identidade visual original do Strigoi.'
+    }
 }
 
 $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Filter makeappx.exe -Recurse -ErrorAction SilentlyContinue |
@@ -75,11 +106,12 @@ if ($Product -eq 'Monitor') {
     Copy-Item -LiteralPath $MonitorExe -Destination (Join-Path $stage 'FirawynixMonitor.exe')
     $executable = 'FirawynixMonitor.exe'
 } else {
-    Get-ChildItem -LiteralPath $IdeDir -Force | Copy-Item -Destination $stage -Recurse -Force
+    $sourceDir = if ($Product -eq 'Strigoi') { $StrigoiDir } else { $IdeDir }
+    Get-ChildItem -LiteralPath $sourceDir -Force | Copy-Item -Destination $stage -Recurse -Force
     $executable = 'Strigoi.exe'
 }
 
-$icon = Join-Path $workspace $settings.Icon
+$icon = if ($Product -eq 'Strigoi') { $StrigoiIcon } else { Join-Path $workspace $settings.Icon }
 $python = Get-Command python.exe -ErrorAction Stop | Select-Object -ExpandProperty Source
 & $python (Join-Path $PSScriptRoot 'make-assets.py') $icon (Join-Path $stage 'Assets')
 if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar os logotipos.' }
