@@ -21,3 +21,7 @@ A [política de privacidade](privacy-policy.md) descreve os dados locais e os re
 ## Site local
 
 A página de apresentação fica em [`site/`](site/README.md), com barra inferior fixa e links para a Microsoft Store e o repositório FIRAWYNIX. Ela pode ser aberta localmente em `http://127.0.0.1:4176/` sem conectar aos servidores do Monitor.
+
+## Edições separadas
+
+O Monitor e a IDE também têm [pacotes MSIX independentes](packaging/store/standalone/README.md) para os produtos **Firaw - Monitor** e **Firaw - IDE** na Microsoft Store. As políticas específicas estão em [Monitor](privacy-monitor.md) e [IDE](privacy-ide.md).
