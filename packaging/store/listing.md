@@ -26,6 +26,12 @@ de modelos, dependem da sua configuração ou de uma ação sua.
 para recursos que dependem dela. Modelos de IA exigem espaço adicional em
 disco e hardware compatível.
 
+**Capturas para Desktop:**
+
+- `assets/monitor-demo.png` — Monitor com dados simulados, sem conexão SSH real.
+- `../../modules/firawmerge/assets/diff-screenshot.png` — comparação local no
+  FirawMerge.
+
 ## English (United States)
 
 **Short description:** Linux service monitoring, a local AI IDE, and file
@@ -51,3 +57,6 @@ downloads depend on your configuration or an action you take.
 **Requirements:** Windows 10 or 11, x64. A network connection is needed only
 for features that use it. AI models need additional disk space and compatible
 hardware.
+
+**Desktop screenshots:** Use the same two files above. Caption the Monitor
+image as a demonstration with simulated data.
