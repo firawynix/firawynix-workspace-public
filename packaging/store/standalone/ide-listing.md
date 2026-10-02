@@ -19,7 +19,7 @@ Você escolhe quais projetos abrir. A pesquisa web, o download de modelos e as e
 - Recursos opcionais de IA local e seleção de modelo.
 - Integração opcional com FirawMerge instalado separadamente.
 
-**Captura para Desktop:** pendente de captura real da versão ciano, com projeto de exemplo e sem dados privados.
+**Captura para Desktop:** `../assets/ide-demo.png` (a partir de `packaging/store/standalone`). Prévia demonstrativa baseada na interface da IDE, com projeto de exemplo e sem dados privados. Legenda: “Prévia demonstrativa da IDE com projeto local de exemplo; sem conexão com servidor real.”
 
 ## English (United States)
 
@@ -36,4 +36,4 @@ You choose which projects to open. Web search, model downloads, and extensions m
 - Optional local AI tools and model selection.
 - Optional integration with a separately installed FirawMerge.
 
-**Desktop screenshot:** Pending a real screenshot of the cyan version with an example project and no private data.
+**Desktop screenshot:** Use the same illustrative IDE preview. Caption: “Illustrative IDE preview with a local example project; no real server connection.”
