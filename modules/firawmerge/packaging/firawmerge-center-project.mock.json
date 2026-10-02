@@ -1,0 +1,60 @@
+{
+  "id": "firawmerge",
+  "slug": "firawmerge",
+  "nome": "FirawMerge",
+  "subtitulo": "Compare e resolva mudanças entre ambientes",
+  "descricao": "Compare pastas e arquivos, resolva conflitos de duas entradas com IA local e compartilhe revisões interativas em HTML.",
+  "tipo": "download",
+  "categoria": "projeto",
+  "generos": [
+    "Produtividade",
+    "Desenvolvimento"
+  ],
+  "cor": "#22d3ee",
+  "capa": null,
+  "banner": null,
+  "icone": null,
+  "downloadUrl": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-Online-Setup.exe",
+  "downloadTamanho": 759784,
+  "downloadSha256": "bbddd5a3986afc5a259a87ebf80db200cef3792e75731b5f8f22180b0d271d52",
+  "versao": "0.3.0",
+  "winSignerThumbprint": "668BEF56480FCA8EB1B0BC3B102A6A9CEC554CC4",
+  "winChave": "f66155e3-52ac-59d2-ae5f-78317dd2d848",
+  "winExe": "FirawMerge.exe",
+  "winCaminhos": [
+    "%ProgramFiles%\\FirawMerge\\FirawMerge.exe",
+    "%LOCALAPPDATA%\\Programs\\FirawMerge\\FirawMerge.exe"
+  ],
+  "winInstalador": "nsis",
+  "instaladoTamanho": null,
+  "manifestoUrl": null,
+  "winLimpeza": [],
+  "linux": null,
+  "disponivel": true,
+  "extras": [
+    {
+      "rotulo": "Instalador completo (sem internet)",
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-Setup.exe"
+    },
+    {
+      "rotulo": "Portátil x64",
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-x64.exe"
+    },
+    {
+      "rotulo": "Portátil x86",
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-ia32.exe"
+    },
+    {
+      "rotulo": "Certificado público (.cer)",
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMergeContext.cer"
+    },
+    {
+      "rotulo": "Código-fonte no GitHub",
+      "url": "https://github.com/hugomendoncaraizen/firawmerge"
+    }
+  ],
+  "jogarUrl": null,
+  "siteUrl": "https://firawmerge.firawynix.com.br/",
+  "destaque": false,
+  "ordem": 50
+}

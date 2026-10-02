@@ -1,0 +1,36 @@
+{
+  "name": "strigoi-core",
+  "keywords": [
+    "theia-extension"
+  ],
+  "version": "0.1.0",
+  "description": "Local-first AI development environment for Salesforce work",
+  "author": "Strigoi Team",
+  "license": "UNLICENSED",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "dependencies": {
+    "@theia/core": "1.75.0",
+    "@theia/filesystem": "1.75.0",
+    "officeparser": "^8.0.0"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "typescript": "~5.4.5"
+  },
+  "scripts": {
+    "prepare": "rimraf lib && tsc",
+    "clean": "rimraf lib",
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/strigoi-core-frontend-module",
+      "backend": "lib/node/strigoi-core-backend-module",
+      "electronMain": "lib/electron-main/strigoi-core-electron-main-module"
+    }
+  ]
+}

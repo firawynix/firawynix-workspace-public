@@ -1,0 +1,124 @@
+{
+  "private": true,
+  "name": "electron-app",
+  "productName": "Firawynix Workspace IDE",
+  "version": "0.1.0",
+  "description": "Strigoi local-first AI IDE",
+  "main": "lib/backend/electron-main.js",
+  "dependencies": {
+    "@theia/ai-chat": "1.75.0",
+    "@theia/ai-chat-ui": "1.75.0",
+    "@theia/ai-code-completion": "1.75.0",
+    "@theia/ai-core": "1.75.0",
+    "@theia/ai-core-ui": "1.75.0",
+    "@theia/ai-editor": "1.75.0",
+    "@theia/ai-history": "1.75.0",
+    "@theia/ai-ide": "1.75.0",
+    "@theia/ai-mcp": "1.75.0",
+    "@theia/ai-mcp-ui": "1.75.0",
+    "@theia/ai-terminal": "1.75.0",
+    "@theia/bulk-edit": "1.75.0",
+    "@theia/core": "1.75.0",
+    "@theia/editor": "1.75.0",
+    "@theia/electron": "1.75.0",
+    "@theia/filesystem": "1.75.0",
+    "@theia/markers": "1.75.0",
+    "@theia/messages": "1.75.0",
+    "@theia/monaco": "1.75.0",
+    "@theia/navigator": "1.75.0",
+    "@theia/outline-view": "1.75.0",
+    "@theia/plugin-ext-vscode": "1.75.0",
+    "@theia/preferences": "1.75.0",
+    "@theia/process": "1.75.0",
+    "@theia/scm": "1.75.0",
+    "@theia/search-in-workspace": "1.75.0",
+    "@theia/terminal": "1.75.0",
+    "@theia/vsx-registry": "1.75.0",
+    "@theia/workspace": "1.75.0",
+    "strigoi-core": "0.1.0"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.75.0",
+    "electron": "42.8.1"
+  },
+  "scripts": {
+    "bundle": "theia rebuild:electron --cacheRoot .. && theia build --mode development",
+    "rebuild": "theia rebuild:electron --cacheRoot ..",
+    "start": "theia start --plugins=local-dir:../plugins",
+    "watch": "theia rebuild:electron --cacheRoot .. && theia build --watch --mode development"
+  },
+  "theia": {
+    "target": "electron",
+    "frontend": {
+      "config": {
+        "applicationName": "Firawynix Workspace",
+        "defaultLocale": "pt-br",
+        "defaultTheme": "dark",
+        "reloadOnReconnect": true,
+        "preferences": {
+          "toolbar.showToolbar": true,
+          "workbench.colorTheme": "Firawynix Cyan",
+          "editor.fontLigatures": true,
+          "editor.minimap.enabled": true,
+          "editor.fontSize": 14,
+          "diffEditor.renderSideBySide": false,
+          "window.commandCenter": true,
+          "ai-features.AiEnable.enableAI": true,
+          "strigoi.localRuntime.provider": "llama.cpp",
+          "strigoi.localRuntime.selectedModel": "qwen2.5-coder-7b-instruct-q4-k-m",
+          "ai-features.chat.sessionStorageScope": "workspace",
+          "ai-features.chat.persistedSessionLimit": 25,
+          "ai-features.chat.defaultChatAgent": "Strigoi",
+          "ai-features.reasoning.defaults": [
+            {
+              "scope": {
+                "agentId": "Strigoi"
+              },
+              "reasoning": {
+                "level": "off"
+              }
+            }
+          ],
+          "ai-features.languageModelAliases": {
+            "default/code": {
+              "selectedModel": "llama.cpp/qwen2.5-coder-7b-instruct-q4-k-m"
+            },
+            "default/universal": {
+              "selectedModel": "llama.cpp/qwen2.5-coder-7b-instruct-q4-k-m"
+            },
+            "default/code-completion": {
+              "selectedModel": "llama.cpp/qwen2.5-coder-7b-instruct-q4-k-m"
+            },
+            "default/summarize": {
+              "selectedModel": "llama.cpp/qwen2.5-coder-7b-instruct-q4-k-m"
+            },
+            "default/fast": {
+              "selectedModel": "llama.cpp/qwen2.5-coder-7b-instruct-q4-k-m"
+            }
+          }
+        },
+        "electron": {
+          "appUserModelId": "sysmap.strigoi",
+          "showWindowEarly": false,
+          "windowOptions": {
+            "backgroundColor": "#282a36",
+            "icon": "resources/strigoi-icon.png"
+          },
+          "splashScreenOptions": {
+            "content": "resources/splash.html",
+            "width": 520,
+            "height": 300,
+            "minDuration": 900
+          }
+        }
+      }
+    },
+    "backend": {
+      "config": {
+        "configurationFolder": ".strigoi",
+        "frontendConnectionTimeout": -1,
+        "startupTimeout": -1
+      }
+    }
+  }
+}

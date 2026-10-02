@@ -1,0 +1,75 @@
+{
+  "private": true,
+  "name": "browser-app",
+  "productName": "Strigoi Preview",
+  "version": "0.1.0",
+  "description": "Browser development preview for Strigoi",
+  "dependencies": {
+    "@theia/ai-chat": "1.75.0",
+    "@theia/ai-chat-ui": "1.75.0",
+    "@theia/ai-code-completion": "1.75.0",
+    "@theia/ai-core": "1.75.0",
+    "@theia/ai-core-ui": "1.75.0",
+    "@theia/ai-editor": "1.75.0",
+    "@theia/ai-history": "1.75.0",
+    "@theia/ai-ide": "1.75.0",
+    "@theia/ai-mcp": "1.75.0",
+    "@theia/ai-mcp-ui": "1.75.0",
+    "@theia/ai-ollama": "1.75.0",
+    "@theia/ai-terminal": "1.75.0",
+    "@theia/bulk-edit": "1.75.0",
+    "@theia/core": "1.75.0",
+    "@theia/editor": "1.75.0",
+    "@theia/filesystem": "1.75.0",
+    "@theia/markers": "1.75.0",
+    "@theia/messages": "1.75.0",
+    "@theia/monaco": "1.75.0",
+    "@theia/navigator": "1.75.0",
+    "@theia/outline-view": "1.75.0",
+    "@theia/plugin-ext-vscode": "1.75.0",
+    "@theia/preferences": "1.75.0",
+    "@theia/process": "1.75.0",
+    "@theia/scm": "1.75.0",
+    "@theia/search-in-workspace": "1.75.0",
+    "@theia/terminal": "1.75.0",
+    "@theia/vsx-registry": "1.75.0",
+    "@theia/workspace": "1.75.0",
+    "strigoi-core": "0.1.0"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.75.0"
+  },
+  "scripts": {
+    "bundle": "theia build --mode development",
+    "start": "theia start --hostname 127.0.0.1 --port 3100",
+    "watch": "theia build --watch --mode development"
+  },
+  "theia": {
+    "target": "browser",
+    "frontend": {
+      "config": {
+        "applicationName": "Strigoi",
+        "defaultTheme": "dark",
+        "reloadOnReconnect": true,
+        "preferences": {
+          "toolbar.showToolbar": true,
+          "workbench.colorTheme": "Strigoi Astra",
+          "editor.fontLigatures": true,
+          "editor.minimap.enabled": true,
+          "editor.fontSize": 14,
+          "diffEditor.renderSideBySide": false,
+          "window.commandCenter": true,
+          "ai-features.chat.sessionStorageScope": "workspace",
+          "ai-features.chat.persistedSessionLimit": 25
+        }
+      }
+    },
+    "backend": {
+      "config": {
+        "configurationFolder": ".strigoi",
+        "frontendConnectionTimeout": -1,
+        "startupTimeout": -1
+      }
+    }
+  }
+}

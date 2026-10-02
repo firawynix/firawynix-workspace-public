@@ -1,0 +1,46 @@
+{
+  "base": "https://firawmerge.firawynix.com.br/downloads/",
+  "version": "0.3.0",
+  "files": {
+    "FirawMerge-0.3.0-Online-Setup.exe": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-Online-Setup.exe",
+      "size": 759784,
+      "sha256": "bbddd5a3986afc5a259a87ebf80db200cef3792e75731b5f8f22180b0d271d52"
+    },
+    "firawmerge-0.3.0-x64.nsis.7z": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/firawmerge-0.3.0-x64.nsis.7z",
+      "size": 104871636,
+      "sha256": "c9da6aee120551057ecd6c8d084765599bbf0ac47e7e757ff099f9a2e0677aa1"
+    },
+    "firawmerge-0.3.0-ia32.nsis.7z": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/firawmerge-0.3.0-ia32.nsis.7z",
+      "size": 92244426,
+      "sha256": "05abfd6e064f5ec308f272d60aa7d26175090856a47b956c3ae910766261433c"
+    },
+    "latest.yml": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/latest.yml",
+      "size": 816,
+      "sha256": "45f4ad2800f81bf01eb1135a1159017bfc8d3cce4567ce1eee484dab2fccb3c7"
+    },
+    "FirawMergeContext.cer": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMergeContext.cer",
+      "size": 778,
+      "sha256": "a431c424fbce37fe1549f3d117b648c2cbddbffe852f83b6d676d74996e78aad"
+    },
+    "FirawMerge-0.3.0-Setup.exe": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-Setup.exe",
+      "size": 197541704,
+      "sha256": "b3c3e796c223e9d36af3be16a7b69fc2661e38c8dd6325564ee99c2aa21c61b6"
+    },
+    "FirawMerge-0.3.0-x64.exe": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-x64.exe",
+      "size": 94580480,
+      "sha256": "042f42343830a2f01ffd51900f56dc3bc39d6f06bd0b20b1e347631ddc1ca3db"
+    },
+    "FirawMerge-0.3.0-ia32.exe": {
+      "url": "https://firawmerge.firawynix.com.br/downloads/FirawMerge-0.3.0-ia32.exe",
+      "size": 83205336,
+      "sha256": "5371e5c7b592e77725f6c4c3e3e9a713afa80b08150a9049e6c6241f5d3e41bd"
+    }
+  }
+}

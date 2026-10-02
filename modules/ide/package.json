@@ -1,0 +1,88 @@
+{
+  "name": "strigoi",
+  "version": "0.1.17",
+  "private": true,
+  "description": "Local-first AI development environment for Salesforce work",
+  "main": "electron-app/lib/backend/electron-main.js",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "build": "lerna run prepare --scope strigoi-core && lerna run bundle --scope electron-app",
+    "build:core": "lerna run prepare --scope strigoi-core",
+    "build:electron": "lerna run bundle --scope electron-app",
+    "build:preview": "lerna run prepare --scope strigoi-core && lerna run bundle --scope browser-app",
+    "check:m2": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-m2-safety.ps1",
+    "check:skills": "npm run build:core && node scripts/check-skill-routing.js",
+    "check:planning": "npm run build:core && node scripts/check-planning-skill-flow.js",
+    "test:tool-orchestration": "npm run build:core && node scripts/test-tool-orchestration.js",
+    "test:filesystem": "npm run build:core && node scripts/test-filesystem-tools.js",
+    "check:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-runtime.ps1",
+    "benchmark:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/benchmark-local-model.ps1",
+    "model:register": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-local-model.ps1",
+    "package:windows": "npm run build && electron-builder --win nsis --x64",
+    "postinstall": "theia check:theia-version && theia download:plugins && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-language-basics.ps1",
+    "start": "lerna run start --scope electron-app",
+    "start:electron": "lerna run start --scope electron-app",
+    "start:preview": "lerna run start --scope browser-app",
+    "watch": "lerna run --parallel watch"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.15.3",
+    "lerna": "^8.2.4",
+    "node-gyp": "^13.0.1"
+  },
+  "workspaces": [
+    "strigoi-core",
+    "electron-app",
+    "browser-app"
+  ],
+  "theiaPluginsDir": "plugins",
+  "theiaPlugins": {
+    "dracula-theme.theme-dracula": "https://open-vsx.org/api/dracula-theme/theme-dracula/2.25.1/file/dracula-theme.theme-dracula-2.25.1.vsix"
+  },
+  "build": {
+    "appId": "sysmap.strigoi",
+    "productName": "Firawynix Workspace IDE",
+    "executableName": "Strigoi",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron-app/lib/**/*",
+      "electron-app/resources/**/*",
+      "strigoi-core/lib/**/*",
+      "plugins/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "npmRebuild": false,
+    "win": {
+      "icon": "build/strigoi.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Firawynix Workspace IDE",
+      "installerIcon": "build/strigoi.ico",
+      "uninstallerIcon": "build/strigoi.ico",
+      "installerHeaderIcon": "build/strigoi.ico",
+      "include": "installer.nsh",
+      "differentialPackage": false
+    }
+  }
+}

@@ -1,0 +1,1286 @@
+"""Janela principal: seletor de servidor (ou visão geral), métricas, abas, ações,
+alertas e integração com a bandeja.
+
+Regra de ouro de threading: somente a thread da UI toca em widgets. Eventos do
+monitor chegam por ``MonitorManager.events`` e chamadas de outras threads (ex.:
+menu da bandeja) por :meth:`Dashboard.call_in_ui`; ambos são drenados por
+``_pump`` a cada 100 ms via ``after``.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import logging
+import queue
+import shutil
+import subprocess
+import sys
+import time
+import tkinter as tk
+import webbrowser
+from tkinter import filedialog
+from collections import defaultdict
+from collections.abc import Callable
+from concurrent.futures import Future
+from pathlib import Path
+
+import customtkinter as ctk
+
+from config.preferences import Preferences, apply_engine_preferences, engine_preference_key
+from config.settings import Config, ServerConfig
+from config.workspace import (WorkspaceError, WorkspaceSettings,
+                              load_workspace_settings, open_strigoi)
+from core import containers as engines
+from core import winapi
+from core.changes import ChangeAction, Risk, unit_impacts
+from core.history import HistoryStore
+from core.models import (
+    ActionOutcome,
+    ActionResultEvent,
+    AlertKind,
+    ChangeProgressEvent,
+    ContainerImage,
+    CheckLevel,
+    ConnectionEvent,
+    ConnectionState,
+    HealthLevel,
+    HostAlertEvent,
+    HostSnapshot,
+    MonitorEvent,
+    ServiceAction,
+    ServiceAlertEvent,
+    ServiceInfo,
+    ServiceKind,
+    ServiceStatus,
+    SnapshotEvent,
+    Stack,
+    ThresholdAlertEvent,
+)
+from core.monitor import MonitorManager
+from core.notifier import Notifier
+from ui import theme
+from ui.change_dialog import ChangeDialog
+from ui.connections_dialog import ConnectionsDialog
+from ui.containers_tab import ContainersTab, selection_summary
+from ui.engines_dialog import EnginesDialog
+from ui.options import WindowsOptionsDialog
+from ui.secret_prompt import SecretPromptDialog
+from ui.security_tab import SecurityTab
+from ui.tabs import (
+    EventsTab,
+    HistoryTab,
+    NetworkTab,
+    OverviewPanel,
+    ProcessesTab,
+    SchedulesTab,
+    ServicesTab,
+    StacksTab,
+    SystemTab,
+    Tab,
+)
+from ui.vps_tab import VpsTab, fmt_latency
+from ui.widgets import (
+    BANNER_ERROR,
+    BANNER_INFO,
+    BANNER_WARN,
+    GRAY,
+    GREEN,
+    RED,
+    TEXT,
+    YELLOW,
+    ConfirmDialog,
+    CountsCard,
+    MetricCard,
+    TextViewer,
+    fmt_duration,
+    fmt_kb,
+    fmt_mb,
+    fmt_num,
+    fmt_rate,
+    short_path,
+    usage_color,
+)
+from ui.workspace_dialog import LocalMergeDialog, WorkspaceDialog
+
+log = logging.getLogger(__name__)
+
+APP_TITLE = "Firawynix Monitor"
+OVERVIEW = "Visão geral"
+TABS = (ServicesTab, ContainersTab, StacksTab, ProcessesTab, NetworkTab, VpsTab, SecurityTab, SchedulesTab,
+        EventsTab, SystemTab, HistoryTab)
+INTERVAL_OPTIONS = (2, 5, 10, 30, 60)
+CONNECTION_COLORS = {
+    ConnectionState.CONNECTING: YELLOW,
+    ConnectionState.CONNECTED: GREEN,
+    ConnectionState.RECONNECTING: RED,
+    ConnectionState.STOPPED: GRAY,
+}
+
+
+class Dashboard(ctk.CTk):
+    UI_POLL_MS = 100
+    MAX_EVENTS_PER_TICK = 500
+    STATUS_MAX_CHARS = 120
+
+    def __init__(self, app_config: Config, manager: MonitorManager, notifier: Notifier, *,
+                 history: HistoryStore | None = None, icon_path: Path | None = None,
+                 on_quit: Callable[[], None] | None = None, preferences: Preferences | None = None) -> None:
+        super().__init__()
+        self._config = app_config
+        self.preferences = preferences or Preferences(None)
+        self._event_log = winapi.EventLog() if winapi.IS_WINDOWS else None
+        self.manager = manager
+        self.settings = app_config.settings
+        self.history = history
+        self._notifier = notifier
+        self._on_quit = on_quit
+        self._ui_calls: queue.Queue[Callable[[], None]] = queue.Queue()
+        self._snapshots: dict[str, HostSnapshot] = {}
+        self._connections: dict[str, ConnectionEvent] = {}
+        self._offline_notified: set[str] = set()
+        self._busy: dict[str, str] = {}
+        #: Diálogos de mudança segura em andamento (id da mudança → diálogo).
+        self._change_dialogs: dict[str, ChangeDialog] = {}
+        #: Pedidos de segredo/login vindos da conexão: abertos agora, recusados ("Agora não") e pendentes
+        #: (janela escondida na bandeja). Chave: "<servidor>|<o que falta>".
+        self._needs_open: set[str] = set()
+        self._needs_dismissed: set[str] = set()
+        self._needs_pending: dict[str, ConnectionEvent] = {}
+        self._current: str | None = app_config.servers[0].name if len(app_config.servers) == 1 else None
+        self._tray = None
+        self._hidden_hint_shown = False
+        self._quitting = False
+        try:
+            self._workspace_settings = load_workspace_settings()
+            self._workspace_error = ""
+        except WorkspaceError as exc:
+            self._workspace_settings = WorkspaceSettings()
+            self._workspace_error = str(exc)
+
+        self.title(APP_TITLE)
+        self.geometry("1400x900")
+        self.minsize(1120, 700)
+        if icon_path is not None and sys.platform == "win32":
+            try:
+                self.iconbitmap(default=str(icon_path))
+            except tk.TclError:
+                log.debug("Não foi possível definir o ícone da janela", exc_info=True)
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(3, weight=1)
+        self._build_header()
+        self._build_cards()
+        self._build_banner()
+        self._build_content()
+        self._build_statusbar()
+        if self._workspace_error:
+            self.set_status(self._workspace_error, warning=True)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.after(300, lambda: theme.style_window(self, accent=self.settings.windows.accent_title_bar))
+        if self.windows_pref("prevent_sleep"):
+            winapi.prevent_sleep(True)
+        self.bind("<F5>", lambda _e: self.refresh_current())
+        self.bind("<Control-f>", lambda _e: self._focus_search())
+        self.report_callback_exception = self._report_callback_exception
+        self._apply_selection()
+        self.after(self.UI_POLL_MS, self._pump)
+        self.after(1000, self._tick)
+
+    # -- construção ---------------------------------------------------------
+
+    def _build_header(self) -> None:
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=18, pady=(14, 8))
+        header.grid_columnconfigure(0, weight=1)
+        brand = ctk.CTkFrame(header, fg_color="transparent")
+        brand.grid(row=0, column=0, sticky="w")
+        title = ctk.CTkFrame(brand, fg_color="transparent")
+        title.pack(anchor="w")
+        ctk.CTkLabel(title, text="◆", text_color=theme.ACCENT_TEXT, font=ctk.CTkFont(size=20)).pack(side="left",
+                                                                                                 padx=(0, 8))
+        ctk.CTkLabel(title, text=APP_TITLE, anchor="w", font=ctk.CTkFont(size=22, weight="bold")).pack(side="left")
+        self._overview_label = ctk.CTkLabel(brand, text="", anchor="w", text_color=GRAY)
+        self._overview_label.pack(anchor="w")
+
+        controls = ctk.CTkFrame(header, fg_color="transparent")
+        controls.grid(row=0, column=1, sticky="e")
+        ctk.CTkLabel(controls, text="Servidor").pack(side="left", padx=(0, 6))
+        self._server_menu = ctk.CTkOptionMenu(controls, values=[OVERVIEW, *self.manager.server_names], width=220,
+                                              dynamic_resizing=False, command=self._on_server_menu)
+        self._server_menu.pack(side="left", padx=(0, 12))
+        self._conn_badge = ctk.CTkLabel(controls, text="", width=240, anchor="w")
+        self._conn_badge.pack(side="left", padx=(0, 8))
+        self._terminal_btn = ctk.CTkButton(controls, text="Terminal SSH", width=110, command=self.open_terminal,
+                                           fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER,
+                                           text_color=theme.TEXT)
+        self._terminal_btn.pack(side="left", padx=(0, 8))
+        ctk.CTkButton(controls, text="Conexões", width=96, command=lambda: self.open_connections(self._current),
+                      fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER,
+                      text_color=theme.TEXT).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(controls, text="Windows ⚙", width=104, command=self.open_options, fg_color=theme.NEUTRAL,
+                      hover_color=theme.NEUTRAL_HOVER, text_color=theme.TEXT).pack(side="left", padx=(0, 12))
+        ctk.CTkLabel(controls, text="Intervalo").pack(side="left", padx=(0, 6))
+        interval = self.settings.poll_interval_seconds
+        options = sorted({*INTERVAL_OPTIONS, int(interval) if float(interval).is_integer() else interval})
+        self._interval_menu = ctk.CTkOptionMenu(controls, values=[self._fmt_interval(v) for v in options],
+                                                width=84, command=self._on_interval_selected)
+        self._interval_menu.set(self._fmt_interval(interval))
+        self._interval_menu.pack(side="left", padx=(0, 12))
+        ctk.CTkButton(controls, text="Atualizar", width=96, command=self.refresh_current).pack(side="left")
+
+        workspace = ctk.CTkFrame(header, fg_color=theme.PANEL_BG, corner_radius=8)
+        workspace.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        ctk.CTkLabel(workspace, text="FERRAMENTAS LOCAIS", font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color=theme.TEXT_SECONDARY).pack(side="left", padx=(12, 16))
+        ctk.CTkButton(workspace, text="Comparar arquivos/pastas", width=190,
+                      command=self._open_firawmerge).pack(side="left", padx=(0, 8), pady=8)
+        ctk.CTkButton(workspace, text="Abrir IDE", width=120, command=self._open_strigoi).pack(
+            side="left", padx=(0, 8), pady=8)
+        ctk.CTkButton(workspace, text="Abrir pasta na IDE", width=145,
+                      command=self._open_folder_in_strigoi).pack(side="left", padx=(0, 8), pady=8)
+        ctk.CTkButton(workspace, text="Configurar ferramentas ⚙", width=170,
+                      command=self._open_workspace_settings,
+                      fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER,
+                      text_color=theme.TEXT).pack(side="right", padx=12, pady=8)
+
+    def _build_cards(self) -> None:
+        self._cards_row = ctk.CTkFrame(self, fg_color="transparent")
+        self._cards_row.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 8))
+        for column in range(6):
+            self._cards_row.grid_columnconfigure(column, weight=1, uniform="metric")
+        self._cpu_card = MetricCard(self._cards_row, "CPU")
+        self._mem_card = MetricCard(self._cards_row, "Memória")
+        self._disk_card = MetricCard(self._cards_row, "Disco")
+        self._net_card = MetricCard(self._cards_row, "Rede", with_bar=False)
+        self._uptime_card = MetricCard(self._cards_row, "Uptime", with_bar=False)
+        self._counts_card = CountsCard(self._cards_row, "Cargas")
+        cards = (self._cpu_card, self._mem_card, self._disk_card, self._net_card, self._uptime_card,
+                 self._counts_card)
+        for column, card in enumerate(cards):
+            card.grid(row=0, column=column, sticky="nsew", padx=(0 if column == 0 else 5, 0 if column == 5 else 5))
+
+    def _build_banner(self) -> None:
+        self._banner = ctk.CTkLabel(self, text="", anchor="w", justify="left", corner_radius=8,
+                                    fg_color=BANNER_WARN, wraplength=1300)
+        self._banner.grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 8), ipady=6)
+        self._banner.grid_remove()
+
+    def _build_content(self) -> None:
+        content = ctk.CTkFrame(self, fg_color="transparent")
+        content.grid(row=3, column=0, sticky="nsew", padx=18)
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(0, weight=1)
+        self._overview = OverviewPanel(content, self)
+        self._overview.grid(row=0, column=0, sticky="nsew")
+        self._tabview = ctk.CTkTabview(content, anchor="w", command=self.render_current_tab)
+        self._tabview.grid(row=0, column=0, sticky="nsew")
+        self._tabs: dict[str, Tab] = {}
+        for tab_cls in TABS:
+            frame = self._tabview.add(tab_cls.title)
+            tab = tab_cls(frame, self)
+            tab.pack(fill="both", expand=True)
+            self._tabs[tab_cls.title] = tab
+
+    def _build_statusbar(self) -> None:
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.grid(row=4, column=0, sticky="ew", padx=18, pady=(6, 10))
+        bar.grid_columnconfigure(0, weight=1)
+        self._status_msg = ctk.CTkLabel(bar, text="Pronto.", anchor="w")
+        self._status_msg.grid(row=0, column=0, sticky="ew")
+        self._status_info = ctk.CTkLabel(bar, text="", anchor="e", text_color=GRAY)
+        self._status_info.grid(row=0, column=1, sticky="e", padx=(12, 12))
+        self._alerts_switch = ctk.CTkSwitch(bar, text="Alertas", command=self._on_alerts_switch)
+        if self.settings.notifications.enabled:
+            self._alerts_switch.select()
+        else:
+            self._alerts_switch.configure(state="disabled")
+        self._alerts_switch.grid(row=0, column=2, sticky="e")
+
+    # -- API usada pelas abas -------------------------------------------------
+
+    def server_config(self, name: str) -> ServerConfig:
+        """Configuração em vigor (inclui a escolha de motores feita no painel)."""
+        return self.manager.server_config(name)
+
+    def snapshot(self, server: str) -> HostSnapshot | None:
+        return self._snapshots.get(server)
+
+    @property
+    def current_server(self) -> str | None:
+        return self._current
+
+    def busy_label(self, server: str, key: str) -> str | None:
+        return self._busy.get(f"{server}|{key}")
+
+    def set_status(self, text: str, *, error: bool = False, warning: bool = False) -> None:
+        color = RED if error else YELLOW if warning else TEXT
+        text = " ".join(text.split())
+        if len(text) > self.STATUS_MAX_CHARS:
+            text = text[: self.STATUS_MAX_CHARS - 1] + "…"
+        self._status_msg.configure(text=f"{time.strftime('%H:%M:%S')}  {text}", text_color=color)
+
+    def _open_workspace_settings(self) -> None:
+        WorkspaceDialog(self, self._workspace_settings, self._workspace_saved)
+
+    def _workspace_saved(self, _settings: WorkspaceSettings) -> None:
+        self._workspace_settings = load_workspace_settings()
+        self.set_status("Ferramentas locais configuradas.")
+
+    def _open_firawmerge(self) -> None:
+        LocalMergeDialog(self, self._workspace_settings,
+                         lambda: self.set_status("Comparação local aberta no FirawMerge."))
+
+    def _open_strigoi(self) -> None:
+        try:
+            open_strigoi(self._workspace_settings)
+            self.set_status("Firawynix Workspace IDE iniciada.")
+        except WorkspaceError as exc:
+            self.set_status(str(exc), error=True)
+            self._open_workspace_settings()
+
+    def _open_folder_in_strigoi(self) -> None:
+        folder = filedialog.askdirectory(parent=self, title="Escolha uma pasta local para a IDE")
+        if not folder:
+            return
+        try:
+            open_strigoi(self._workspace_settings, folder)
+            self.set_status(f"Pasta local aberta na IDE: {folder}")
+        except WorkspaceError as exc:
+            self.set_status(str(exc), error=True)
+            self._open_workspace_settings()
+
+    def copy_text(self, text: str) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        self.set_status(f"Copiado: {text}")
+
+    def show_text(self, title: str, *, subtitle: str = "", text: str | None = None,
+                  fetch: Callable[[int], Future[str]] | None = None,
+                  preview: Callable[[int], str] | None = None) -> None:
+        TextViewer(self, title=title, subtitle=subtitle, text=text, fetch=fetch, command_preview=preview,
+                   lines=self.settings.log_lines)
+
+    def confirm(self, title: str, message: str, confirm_text: str, danger: bool = False) -> bool:
+        return ConfirmDialog(self, title=title, message=message, confirm_text=confirm_text, danger=danger).show()
+
+    def run_service_action(self, server: str, service: ServiceInfo, action: ServiceAction) -> None:
+        if not self._ensure_connected(server):
+            return
+        if service.kind.manageable:  # contêineres: análise de risco, backup, execução e verificação
+            self.open_change(server, ChangeAction(action.value), service=service)
+            return
+        noun = {ServiceKind.SYSTEMD: "a unidade", ServiceKind.KUBERNETES: "o pod",
+                ServiceKind.LIBVIRT: "a VM"}.get(service.kind, "o contêiner")
+        message = f"Deseja {action.label.lower()} {noun} \"{service.name}\" em {server}?"
+        if service.kind is ServiceKind.KUBERNETES:
+            message = (f"Reiniciar o pod \"{service.name}\" em {server}?\n\nO pod será excluído e recriado pelo "
+                       "controlador (Deployment/StatefulSet). Pods avulsos não voltam sozinhos.")
+        elif service.kind is ServiceKind.LIBVIRT and action is ServiceAction.STOP:
+            message += "\n\nSerá enviado um desligamento ACPI (shutdown), não um desligamento forçado."
+        if service.critical and tuple(self.server_config(server).critical_services) != ("*",):
+            message += "\n\nAtenção: este item está marcado como CRÍTICO."
+        if action is ServiceAction.STOP:
+            message += "\n\nEle ficará indisponível até ser iniciado novamente."
+        danger = action is ServiceAction.STOP
+        if service.kind is ServiceKind.SYSTEMD:
+            impacts = unit_impacts(service.name, action.value, self.server_config(server).connector.type)
+            if impacts:
+                worst = max(i.level for i in impacts)
+                message += f"\n\nRISCO {worst.label.upper()} — o que pode ser afetado:\n" + "\n".join(
+                    f"• {i.area}: {i.title}" for i in impacts)
+                danger = danger or worst >= Risk.HIGH
+        if not self.confirm(f"{action.label} {service.name}", message, action.label, danger):
+            return
+        self._mark_busy(server, service.key, action.progress_label, service.name)
+        self.manager.run_action(server, service, action)
+
+    def run_stack_action(self, server: str, stack: Stack, action: ServiceAction) -> None:
+        if not self._ensure_connected(server):
+            return
+        names = ", ".join(m.name for m in stack.members[:6]) + ("…" if len(stack.members) > 6 else "")
+        message = (f"Deseja {action.label.lower()} os {len(stack.members)} contêineres da stack \"{stack.name}\" "
+                   f"em {server}?\n\n{names}")
+        if not self.confirm(f"{action.label} stack {stack.name}", message, action.label,
+                            action is ServiceAction.STOP):
+            return
+        self._mark_busy(server, stack.key, action.progress_label, f"stack {stack.name}")
+        self.manager.run_stack_action(server, stack, action)
+
+    def kill_process(self, server: str, pid: int, force: bool) -> None:
+        if not self._ensure_connected(server):
+            return
+        signal = "SIGKILL (imediato, sem limpeza)" if force else "SIGTERM (encerramento gracioso)"
+        if not self.confirm("Encerrar processo", f"Enviar {signal} ao PID {pid} em {server}?",
+                            "Forçar" if force else "Encerrar", danger=True):
+            return
+        self._mark_busy(server, f"pid:{pid}", "Encerrando", f"PID {pid}")
+        self.manager.kill_process(server, pid, force)
+
+    def fail2ban_action(self, server: str, jail: str, ip: str, ban: bool) -> None:
+        if not self._ensure_connected(server):
+            return
+        if ban:
+            title, verb = f"Banir {ip}", "Banir"
+            message = (f"Banir {ip} na jail \"{jail}\" do fail2ban em {server}?\n\nO IP fica bloqueado pelo tempo "
+                       "de banimento configurado na jail (bantime).")
+        else:
+            title, verb = f"Desbanir {ip}", "Desbanir"
+            message = f"Remover {ip} da jail \"{jail}\" em {server}? O acesso a partir dele volta a ser permitido."
+        if not self.confirm(title, message, verb, danger=ban):
+            return
+        self._mark_busy(server, f"ip:{ip}", "Banindo" if ban else "Desbanindo", ip)
+        self.manager.fail2ban_action(server, jail, ip, ban)
+
+    def open_change(self, server: str, action: ChangeAction, *, service: ServiceInfo | None = None,
+                    spec=None, record=None, use_snapshot: bool = False) -> None:
+        """Mudança segura: analisar risco → informar impacto → salvar → executar → confirmar."""
+        if not self._ensure_connected(server):
+            return
+        ChangeDialog(self, server, action, service=service, spec=spec, record=record, use_snapshot=use_snapshot)
+
+    def open_new_container(self, server: str) -> None:
+        from ui.new_container_dialog import NewContainerDialog
+
+        if self._ensure_connected(server):
+            NewContainerDialog(self, server)
+
+    def register_change(self, change_id: str, dialog: ChangeDialog) -> None:
+        self._change_dialogs[change_id] = dialog
+
+    def _on_change_progress(self, event: ChangeProgressEvent) -> None:
+        dialog = self._change_dialogs.get(event.change_id)
+        if dialog is not None:
+            try:
+                dialog.on_progress(event)
+            except tk.TclError:  # diálogo fechado: a mudança continua em segundo plano
+                self._change_dialogs.pop(event.change_id, None)
+        if not event.finished:
+            return
+        self._change_dialogs.pop(event.change_id, None)
+        record = next((r for r in self.manager.change_records(event.server) if r.id == event.record_id), None)
+        what = f"{record.action} {record.target}" if record else event.change_id
+        level = {"ok": "info", "warning": "warning"}.get(event.outcome, "error")
+        self.log_windows_event(f"[{event.server}] Mudança segura '{what}': {event.outcome} — {event.message}",
+                               level, "action")
+        text = {"ok": "concluída", "warning": "concluída com avisos", "error": "NÃO concluída"}.get(event.outcome,
+                                                                                                    event.outcome)
+        self.set_status(f"[{event.server}] Mudança {what} {text}. {event.message}", error=event.outcome == "error",
+                        warning=event.outcome == "warning")
+        if dialog is None or not dialog.winfo_exists():
+            self._notifier.notify(f"Mudança {text}: {what}", f"{event.server} · {event.message}"[:200])
+
+    def container_op(self, server: str, service: ServiceInfo, op: str) -> None:
+        """Pausar / retomar / remover — o mesmo diálogo para Docker, Podman e containerd."""
+        if not self._ensure_connected(server):
+            return
+        mapped = {"pause": ChangeAction.PAUSE, "unpause": ChangeAction.UNPAUSE, "rm": ChangeAction.REMOVE}.get(op)
+        if mapped is not None and service.kind.manageable:
+            self.open_change(server, mapped, service=service)
+            return
+        engine = service.kind.label
+        if op == "pause":
+            title, verb, danger = f"Pausar {service.name}", "Pausar", False
+            message = (f"Pausar o contêiner \"{service.name}\" ({engine}) em {server}?\n\nOs processos ficam "
+                       "congelados (cgroup freezer) até \"Retomar\"; a memória continua ocupada.")
+        elif op == "unpause":
+            title, verb, danger = f"Retomar {service.name}", "Retomar", False
+            message = f"Retomar o contêiner pausado \"{service.name}\" ({engine}) em {server}?"
+        elif op == "rm":
+            title, verb, danger = f"Remover {service.name}", "Remover", True
+            message = (f"Remover definitivamente o contêiner parado \"{service.name}\" ({engine}) em {server}?\n\n"
+                       "Volumes nomeados são mantidos. Para voltar, será preciso recriá-lo (ex.: compose up -d).")
+        else:
+            return
+        if service.critical and tuple(self.server_config(server).critical_services) != ("*",):
+            message += "\n\nAtenção: este item está marcado como CRÍTICO."
+        if not self.confirm(title, message, verb, danger):
+            return
+        label = {"pause": "Pausando", "unpause": "Retomando", "rm": "Removendo"}[op]
+        self._mark_busy(server, service.key, label, service.name)
+        self.manager.container_op(server, service, op)
+
+    def image_op(self, server: str, engine_id: str, image: ContainerImage | None, op: str) -> None:
+        if not self._ensure_connected(server):
+            return
+        engine = engines.ENGINES[engine_id].label
+        if op == "prune":
+            title, verb = f"Limpar imagens órfãs — {engine}", "Limpar"
+            message = (f"Remover todas as imagens órfãs (sem tag) do {engine} em {server}?\n\n"
+                       "Imagens com tag e imagens em uso não são afetadas.")
+            busy, target = f"prune:{engine_id}", f"imagens órfãs ({engine})"
+        elif op == "rmi" and image is not None:
+            title, verb = f"Remover imagem {image.reference}", "Remover"
+            message = (f"Remover a imagem \"{image.reference}\" ({engine}) de {server}?\n\n"
+                       "Se algum contêiner (mesmo parado) usar esta imagem, o motor recusa a remoção. "
+                       "Ela pode ser baixada de novo com pull.")
+            busy, target = f"image:{image.key}", image.reference
+        else:
+            return
+        if not self.confirm(title, message, verb, danger=True):
+            return
+        self._mark_busy(server, busy, "Removendo", target)
+        self.manager.image_op(server, engine_id, image, op)
+
+    def volume_op(self, server: str, engine_id: str, name: str, op: str) -> None:
+        if op != "rm" or not self._ensure_connected(server):
+            return
+        engine = engines.ENGINES[engine_id].label
+        message = (f"Remover o volume \"{name}\" ({engine}) de {server}?\n\n"
+                   "OS DADOS DO VOLUME SERÃO APAGADOS e não podem ser recuperados pelo painel.")
+        if not self.confirm(f"Remover volume {name}", message, "Remover volume", danger=True):
+            return
+        self._mark_busy(server, f"volume:{engine_id}:{name}", "Removendo", f"volume {name}")
+        self.manager.volume_op(server, engine_id, name, op)
+
+    def inspect_item(self, server: str, what: str, engine_id: str, target, name: str) -> None:
+        """JSON do ``inspect`` (contêiner, imagem ou volume) de qualquer motor."""
+        if not self._ensure_connected(server):
+            return
+        engine = engines.ENGINES[engine_id].label if engine_id in engines.ENGINES else engine_id
+        noun = {"container": "contêiner", "image": "imagem", "volume": "volume"}[what]
+        TextViewer(self, title=f"Inspecionar {noun} — {name}", subtitle=f"{noun} {name}  ·  {engine}  ·  {server}",
+                   fetch=lambda _lines: self.manager.inspect(server, what, engine_id, target), line_selector=False)
+
+    def open_console(self, server: str, service: ServiceInfo) -> None:
+        """Shell interativo no contêiner: ``ssh -t ... <motor> exec -it``."""
+        if not self._ensure_connected(server):
+            return
+        try:
+            remote = self.manager.console_command(server, service)
+        except ValueError as exc:
+            self.set_status(str(exc), error=True)
+            return
+        self._launch_ssh(server, remote, f"{service.name} @ {server}")
+
+    def open_url(self, url: str) -> None:
+        if not url.startswith(("http://", "https://")):
+            return
+        try:
+            webbrowser.open(url, new=2)
+        except webbrowser.Error as exc:
+            self.copy_text(url)
+            self.set_status(f"Não foi possível abrir o navegador ({exc}). Endereço copiado.", warning=True)
+            return
+        self.set_status(f"Abrindo {url} no navegador…")
+
+    # -- servidores e conexões -----------------------------------------------------
+
+    @property
+    def config_source(self) -> Path | None:
+        """servers.json em uso (None no modo demonstração: nada é gravado)."""
+        return self._config.source
+
+    def config_servers(self) -> tuple[ServerConfig, ...]:
+        return self._config.servers
+
+    def open_connections(self, server: str | None = None) -> None:
+        # Quem abre o diálogo quer ver/ajustar a conexão: volta a perguntar segredos recusados antes.
+        self._needs_dismissed = {k for k in self._needs_dismissed if server and not k.startswith(f"{server}|")}
+        ConnectionsDialog(self, server)
+
+    def apply_config(self, config: Config) -> dict[str, list[str]]:
+        """Aplica o servers.json editado sem reiniciar: só o servidor alterado reconecta."""
+        config = apply_engine_preferences(dataclasses.replace(config, source=self._config.source), self.preferences)
+        result = self.manager.apply_config(config)
+        self._config = config
+        for name in result["removed"] + result["updated"]:
+            self._connections.pop(name, None)
+            self._offline_notified.discard(name)
+            for key in [k for k in self._needs_dismissed | set(self._needs_pending) if k.startswith(f"{name}|")]:
+                self._needs_dismissed.discard(key)
+                self._needs_pending.pop(key, None)
+        for name in result["removed"]:
+            self._snapshots.pop(name, None)
+            self._busy = {k: v for k, v in self._busy.items() if not k.startswith(f"{name}|")}
+        if self._current is not None and self._current not in self.manager.monitors:
+            self.select_server(None if len(self.manager.server_names) != 1 else self.manager.server_names[0])
+        else:
+            self._render_all()
+        changed = [f"{label}: {', '.join(result[key])}" for key, label in
+                   (("added", "novos"), ("updated", "atualizados"), ("removed", "removidos")) if result[key]]
+        if changed:
+            self.log_windows_event(f"Servidores e conexões alterados ({'; '.join(changed)}).", "info", "app")
+        return result
+
+    def _on_connection_needs(self, server: str, event: ConnectionEvent) -> None:
+        """A conexão parou por falta de senha/passphrase ("pedir ao conectar") ou de login no Cloudflare."""
+        key = f"{server}|{event.needs}|{event.needs_target}"
+        if key in self._needs_open or key in self._needs_dismissed:
+            return
+        if not self.winfo_viewable():  # escondido na bandeja: avisa e pergunta quando a janela voltar
+            if key not in self._needs_pending:
+                self._notifier.notify(f"{server}: ação necessária para conectar", event.message,
+                                      key=f"{server}:needs")
+            self._needs_pending[key] = event
+            return
+        self._needs_pending.pop(key, None)
+        self._needs_open.add(key)
+        self.after(0, lambda: self._ask_needs(server, key, event))
+
+    def _ask_needs(self, server: str, key: str, event: ConnectionEvent) -> None:
+        try:
+            if server not in self.manager.monitors:
+                return
+            if event.needs in ("password", "passphrase"):
+                dialog = SecretPromptDialog(self, server, event.needs_target or server, event.needs, event.message)
+                self.wait_window(dialog)
+                if not dialog.submitted:
+                    self._needs_dismissed.add(key)
+                    self.set_status(f"[{server}] Sem o segredo não há conexão. Informe em \"Conexões\".",
+                                    warning=True)
+            elif event.needs == "cloudflare-login":
+                if self.confirm("Login no Cloudflare Access",
+                                f"{server} é acessado pelo Cloudflare Tunnel e ainda não há login salvo neste PC.\n\n"
+                                "Abrir o navegador para entrar agora? Depois do login, o cloudflared guarda o "
+                                "token e o painel reconecta sozinho.", "Abrir o navegador"):
+                    self._cloudflare_login(server)
+                else:
+                    self._needs_dismissed.add(key)
+        finally:
+            self._needs_open.discard(key)
+
+    def _cloudflare_login(self, server: str) -> None:
+        from core.connectors import ConnectorError, cloudflared_login
+
+        try:
+            process = cloudflared_login(self.server_config(server))
+        except (ConnectorError, OSError) as exc:
+            self.set_status(f"[{server}] Login no Cloudflare Access: {exc}", error=True)
+            return
+        self.set_status(f"[{server}] Conclua o login do Cloudflare Access no navegador…")
+        deadline = time.monotonic() + 600
+
+        def wait() -> None:
+            code = process.poll()
+            if code is None and time.monotonic() < deadline:
+                self.after(1000, wait)
+                return
+            if code == 0 and server in self.manager.monitors:
+                self.manager.reconnect(server)
+                self.set_status(f"[{server}] Login no Cloudflare Access concluído. Conectando…")
+            else:
+                if code is None:
+                    process.kill()
+                self.set_status(f"[{server}] O login no Cloudflare Access não foi concluído.", warning=True)
+
+        self.after(1000, wait)
+
+    def open_engines_dialog(self, server: str | None = None) -> None:
+        EnginesDialog(self, server or self._current)
+
+    def apply_engine_selection(self, server: str, selection: dict) -> None:
+        """Salva a escolha de motores (preferences.json) e aplica sem reiniciar."""
+        self.preferences.set(engine_preference_key(server), selection)
+        self.manager.set_engine_modes(server, engines.selection_to_modes(selection))
+        self.log_windows_event(f"[{server}] Motores de contêiner: {selection_summary(selection)}.", "info", "app")
+        self.set_status(f"[{server}] Motores de contêiner: {selection_summary(selection)}. Detectando…")
+        self.render_current_tab()
+
+    def open_logs(self, server: str, service: ServiceInfo) -> None:
+        title = "Detalhes" if service.kind is ServiceKind.LIBVIRT else "Logs"
+        self.show_text(f"{title} — {service.name} @ {server}", subtitle=f"{service.name}  ·  {server}",
+                       fetch=lambda lines: self.manager.fetch_logs(server, service, lines),
+                       preview=lambda lines: self.manager.logs_command(server, service, lines))
+
+    def open_stack_logs(self, server: str, stack: Stack) -> None:
+        self.show_text(f"Logs — stack {stack.name} @ {server}",
+                       subtitle=f"stack {stack.name} ({len(stack.members)} membros)  ·  {server}",
+                       fetch=lambda lines: self.manager.fetch_stack_logs(server, stack, lines))
+
+    def _ensure_connected(self, server: str) -> bool:
+        if self.manager.is_connected(server):
+            return True
+        self.set_status(f"{server} está desconectado; ação indisponível.", error=True)
+        return False
+
+    def _mark_busy(self, server: str, key: str, label: str, target: str) -> None:
+        self._busy[f"{server}|{key}"] = label
+        self.set_status(f"{label} {target} em {server}…")
+        self.render_current_tab()
+
+    # -- API pública (tray / main) --------------------------------------------
+
+    def windows_pref(self, key: str) -> bool:
+        return bool(self.preferences.get(f"windows.{key}", getattr(self.settings.windows, key)))
+
+    def set_windows_pref(self, key: str, enabled: bool) -> None:
+        self.preferences.set(f"windows.{key}", enabled)
+        if key == "prevent_sleep":
+            winapi.prevent_sleep(enabled)
+        self.set_status(f"Opção do Windows '{key}' {'ativada' if enabled else 'desativada'}.")
+
+    def autostart_enabled(self) -> bool:
+        return winapi.autostart_enabled()
+
+    def set_autostart(self, enabled: bool) -> bool:
+        ok = winapi.set_autostart(enabled, winapi.autostart_command(self._config.source))
+        if ok:
+            self.set_status("Iniciará com o Windows." if enabled else "Não iniciará mais com o Windows.")
+            if self._tray is not None:
+                self._tray.refresh_menu()
+        else:
+            self.set_status("Não foi possível alterar a inicialização com o Windows.", error=True)
+        return ok
+
+    def log_windows_event(self, message: str, level: str = "info", category: str = "app") -> None:
+        if self._event_log is not None and self.windows_pref("event_log"):
+            self._event_log.write(message, level, category)
+
+    def _flash(self, critical: bool) -> None:
+        if critical and self.windows_pref("flash_taskbar") and self.state() != "withdrawn":
+            winapi.flash_taskbar(self)
+
+    def open_options(self) -> None:
+        WindowsOptionsDialog(self)
+
+    def call_in_ui(self, fn: Callable[[], None]) -> None:
+        """Thread-safe: agenda ``fn`` para a thread da UI."""
+        self._ui_calls.put(fn)
+
+    def attach_tray(self, tray) -> None:
+        self._tray = tray
+        tray.set_muted(self._notifier.muted)
+        self._update_tray()
+
+    @property
+    def tray_available(self) -> bool:
+        return self._tray is not None and self._tray.available
+
+    @property
+    def can_hide_to_tray(self) -> bool:
+        # Só no Windows a área de notificação é garantida; em outros sistemas o
+        # ícone pode não aparecer (sem system tray) e a janela ficaria inacessível.
+        return self.tray_available and sys.platform == "win32"
+
+    def show_window(self) -> None:
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+        self.attributes("-topmost", True)
+        self.after(250, lambda: self.attributes("-topmost", False))
+        pending, self._needs_pending = self._needs_pending, {}
+        for event in pending.values():
+            self.after(400, lambda e=event: self._on_connection_needs(e.server, e))
+
+    def hide_to_tray(self) -> None:
+        self.withdraw()
+        if not self._hidden_hint_shown:
+            self._hidden_hint_shown = True
+            self._notifier.notify(APP_TITLE, "Continua monitorando em segundo plano. "
+                                             "Use o ícone na bandeja para reabrir.", force=True)
+
+    def refresh_current(self) -> None:
+        # "Atualizar" também volta a perguntar a senha/login recusados antes.
+        self._needs_dismissed = {k for k in self._needs_dismissed
+                                 if self._current is not None and not k.startswith(f"{self._current}|")}
+        if self._current is None:
+            self.refresh_all()
+            return
+        self.manager.refresh(self._current, full=True)
+        self.set_status(f"Atualizando {self._current}…")
+
+    def refresh_all(self) -> None:
+        self.manager.refresh(full=True)
+        self.set_status("Atualizando todos os servidores…")
+
+    def set_muted(self, muted: bool) -> None:
+        self._notifier.muted = muted
+        if self.settings.notifications.enabled:
+            (self._alerts_switch.deselect if muted else self._alerts_switch.select)()
+        if self._tray is not None:
+            self._tray.set_muted(muted)
+        self.set_status("Alertas silenciados." if muted else "Alertas reativados.")
+
+    def quit_app(self) -> None:
+        if self._quitting:
+            return
+        self._quitting = True
+        log.info("Encerrando aplicação")
+        if self.windows_pref("prevent_sleep"):
+            winapi.prevent_sleep(False)
+        if self._event_log is not None:
+            self._event_log.close()
+        if self._on_quit is not None:
+            try:
+                self._on_quit()
+            except Exception:  # noqa: BLE001
+                log.exception("Erro no encerramento")
+        self.destroy()
+
+    def open_terminal(self) -> None:
+        """Abre um terminal com ``ssh`` para o servidor atual (cliente OpenSSH do Windows)."""
+        if self._current is not None:
+            self._launch_ssh(self._current)
+
+    def _launch_ssh(self, name: str, remote_command: str | None = None, title: str | None = None) -> None:
+        from core.connectors import openssh_args
+
+        server = self.server_config(name)
+        args = ["ssh", "-p", str(server.port), *openssh_args(server)]
+        if server.key_file:
+            args += ["-i", str(server.key_file)]
+        if remote_command:
+            args.append("-t")  # console interativo dentro do contêiner
+        args.append(f"{server.username}@{server.host}")
+        if remote_command:
+            args.append(remote_command)
+        command_line = subprocess.list2cmdline(args)
+        try:
+            if sys.platform == "win32":
+                wt = shutil.which("wt")
+                if wt:
+                    subprocess.Popen([wt, "new-tab", "--title", title or f"SSH {server.name}", *args])
+                else:
+                    subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            else:
+                terminal = shutil.which("x-terminal-emulator") or shutil.which("gnome-terminal")
+                if terminal is None:
+                    raise FileNotFoundError("nenhum emulador de terminal encontrado")
+                subprocess.Popen([terminal, "-e", command_line] if "x-terminal" in terminal
+                                 else [terminal, "--", *args])
+        except OSError as exc:
+            self.copy_text(command_line)
+            self.set_status(f"Não foi possível abrir o terminal ({exc}). Comando copiado: {command_line}",
+                            warning=True)
+            return
+        self.set_status(f"Terminal aberto: {command_line}")
+
+    def select_server(self, name: str | None, focus_key: str | None = None, tab: str | None = None) -> None:
+        if name != self._current:
+            for current in self._tabs.values():
+                current.reset()
+        self._current = name
+        self._apply_selection()
+        if name is not None and tab in self._tabs:
+            self._tabview.set(tab)
+            self.render_current_tab()
+        elif name is not None and focus_key is not None:
+            self._tabview.set(ServicesTab.title)
+            services = self._tabs[ServicesTab.title]
+            if isinstance(services, ServicesTab):
+                services.show_all_and_select(focus_key)
+
+    # -- renderização -----------------------------------------------------------
+
+    def _apply_selection(self) -> None:
+        if self._current is None:
+            self._tabview.grid_remove()
+            self._cards_row.grid_remove()
+            self._overview.grid()
+            _set_enabled(self._terminal_btn, False)
+        else:
+            self._overview.grid_remove()
+            self._cards_row.grid()
+            self._tabview.grid()
+            _set_enabled(self._terminal_btn, True)
+            self._interval_menu.set(self._fmt_interval(self.manager.monitors[self._current].interval))
+        self._render_all()
+
+    def _render_all(self) -> None:
+        self._render_overview_header()
+        self._render_connection()
+        if self._current is None:
+            self._banner.grid_remove()
+            self._overview.render(self._snapshots, self._connections, self._server_health)
+            self._status_info.configure(text=f"{len(self.manager.server_names)} servidores · "
+                                             f"intervalo {self._fmt_interval(self.settings.poll_interval_seconds)}")
+            return
+        snapshot = self._snapshots.get(self._current)
+        self._render_cards(snapshot)
+        self._render_banner(snapshot)
+        self._render_status_info(snapshot)
+        self.render_current_tab()
+
+    def render_current_tab(self, *_args) -> None:
+        if self._current is None:
+            self._overview.render(self._snapshots, self._connections, self._server_health)
+            return
+        tab = self._tabs.get(self._tabview.get())
+        if tab is None:
+            return
+        try:
+            tab.render(self._current, self._snapshots.get(self._current), self.manager.is_connected(self._current))
+        except Exception:  # noqa: BLE001 - uma aba com defeito não pode travar as outras
+            log.exception("Erro ao renderizar a aba %s", tab.title)
+
+    def _render_connection(self) -> None:
+        if self._current is None:
+            online = sum(1 for e in self._connections.values() if e.state is ConnectionState.CONNECTED)
+            total = len(self.manager.server_names)
+            if total == 0:
+                self._conn_badge.configure(text="● Sem servidores", text_color=GRAY)
+                return
+            self._conn_badge.configure(text=f"● {online}/{total} online",
+                                       text_color=GREEN if online == total else YELLOW if online else RED)
+            return
+        event = self._connections.get(self._current)
+        if event is None:
+            self._conn_badge.configure(text="● Aguardando…", text_color=GRAY)
+            return
+        text = f"● {event.state.label}"
+        snapshot = self._snapshots.get(self._current)
+        if event.state is ConnectionState.CONNECTED and snapshot is not None and snapshot.latency_ms is not None:
+            text += f" · {fmt_latency(snapshot.latency_ms, snapshot.latency_method)}"
+        if event.state is ConnectionState.RECONNECTING and event.retry_in is not None:
+            remaining = event.timestamp + event.retry_in - time.time()
+            text += f" · nova tentativa em {int(remaining) + 1} s" if remaining > 0.5 else " · reconectando…"
+        self._conn_badge.configure(text=text, text_color=CONNECTION_COLORS[event.state])
+
+    def _render_cards(self, snapshot: HostSnapshot | None) -> None:
+        metrics = snapshot.metrics if snapshot else None
+        if snapshot is None:
+            self._counts_card.set_counts(None, None)
+        else:
+            counts = snapshot.counts()
+            parts = [f"{counts[ServiceStatus.STOPPED]} paradas", f"{len(snapshot.services)} total"]
+            # Contêineres CRI são os dos pods (já contados como pods).
+            containers = sum(1 for s in snapshot.services if s.kind.is_container and s.kind is not ServiceKind.CRI)
+            for count, label in ((containers, "contêineres"), (snapshot.count_kind(ServiceKind.KUBERNETES), "pods"),
+                                 (snapshot.count_kind(ServiceKind.LIBVIRT), "VMs"),
+                                 (snapshot.count_kind(ServiceKind.LXD), "LXD")):
+                if count:
+                    parts.append(f"{count} {label}")
+            self._counts_card.set_counts(counts[ServiceStatus.ACTIVE],
+                                         counts[ServiceStatus.FAILED] + counts[ServiceStatus.DEGRADED],
+                                         " · ".join(parts))
+        if metrics is None:
+            for card in (self._cpu_card, self._mem_card, self._disk_card, self._net_card, self._uptime_card):
+                card.set_values("—", "Sem dados")
+            return
+
+        cpu = metrics.cpu_percent
+        load = metrics.load_avg
+        load_text = f"Load {' · '.join(fmt_num(v, 2) for v in load)}" if load else "Load —"
+        if metrics.cpu_count:
+            load_text += f"  ({metrics.cpu_count} vCPU)"
+        steal, iowait = metrics.cpu_steal, metrics.cpu_iowait
+        note, note_color = "", GRAY
+        if steal is not None and (steal >= 0.5 or (iowait or 0) >= 5):
+            note = f"steal {fmt_num(steal, 1)}% · iowait {fmt_num(iowait or 0, 1)}%"
+            limit = self.settings.thresholds.steal_percent
+            note_color = RED if limit and steal >= limit else YELLOW if steal >= 2 else GRAY
+        self._cpu_card.set_values(f"{cpu:.0f}%" if cpu is not None else "…", load_text,
+                                  (cpu or 0) / 100, usage_color(cpu), note=note, note_color=note_color)
+
+        mem_pct = metrics.mem_percent
+        swap = metrics.swap_percent
+        self._mem_card.set_values(f"{mem_pct:.0f}%" if mem_pct is not None else "—",
+                                  f"{fmt_mb(metrics.mem_used_mb)} de {fmt_mb(metrics.mem_total_mb)}",
+                                  (mem_pct or 0) / 100, usage_color(mem_pct),
+                                  note=f"swap {fmt_num(swap, 0)}%" if swap is not None else "",
+                                  note_color=usage_color(swap) if swap and swap >= 75 else GRAY)
+
+        root, fullest = metrics.root_disk, metrics.fullest_disk
+        if root is None:
+            self._disk_card.set_values("—", "Sem dados de disco")
+        else:
+            note, note_color = "", None
+            if fullest is not None and fullest.mount != root.mount and fullest.use_percent > root.use_percent:
+                note = f"Mais cheio: {short_path(fullest.mount)} ({fullest.use_percent:.0f}%)"
+                note_color = usage_color(fullest.use_percent) if fullest.use_percent >= 75 else GRAY
+            self._disk_card.set_values(f"{root.use_percent:.0f}%",
+                                       f"{root.mount} · {fmt_kb(root.avail_kb)} livres de {fmt_kb(root.size_kb)}",
+                                       root.use_percent / 100, usage_color(root.use_percent),
+                                       note=note, note_color=note_color)
+
+        rx, tx = metrics.net_rx_bps, metrics.net_tx_bps
+        io_read, io_write = metrics.disk_read_bps, metrics.disk_write_bps
+        self._net_card.set_values(f"↓ {fmt_rate(rx)}" if rx is not None else "…",
+                                  f"↑ {fmt_rate(tx)} enviados" if tx is not None else "aguardando 2ª amostra",
+                                  note=(f"disco ↓ {fmt_rate(io_read)} ↑ {fmt_rate(io_write)}"
+                                        if io_read is not None else ""))
+
+        system, updates = snapshot.system, snapshot.updates
+        note, note_color = "", GRAY
+        if system is not None and system.reboot_required:
+            note, note_color = "Reinício pendente", YELLOW
+        elif updates is not None and updates.pending:
+            note = f"{updates.pending} atualizações" + (f" ({updates.security} seg.)" if updates.security else "")
+            note_color = YELLOW if updates.security else GRAY
+        self._uptime_card.set_values(fmt_duration(metrics.uptime_seconds),
+                                     f"Coleta em {fmt_num(snapshot.duration, 2)} s", note=note, note_color=note_color)
+
+    def _render_banner(self, snapshot: HostSnapshot | None) -> None:
+        event = self._connections.get(self._current)
+        server_cfg = self.server_config(self._current)
+        text, color = "", BANNER_WARN
+        if event is not None and event.state is ConnectionState.RECONNECTING:
+            stale = " Exibindo os últimos dados coletados." if snapshot else ""
+            text, color = f"Sem conexão com {server_cfg.address}: {event.message}{stale}", BANNER_ERROR
+        elif snapshot is None:
+            text, color = f"Conectando a {server_cfg.address}…", BANNER_INFO
+        elif snapshot.resource_alerts or snapshot.warnings:
+            alerts = [f"Limite excedido: {a}" for a in snapshot.resource_alerts]
+            text = "  |  ".join([*alerts, *snapshot.warnings])
+            color = BANNER_ERROR if snapshot.resource_alerts else BANNER_WARN
+        if text:
+            self._banner.configure(text=text, fg_color=color)
+            self._banner.grid()
+        else:
+            self._banner.grid_remove()
+
+    def _render_status_info(self, snapshot: HostSnapshot | None) -> None:
+        interval = self.manager.monitors[self._current].interval
+        if snapshot is None:
+            self._status_info.configure(text=f"Intervalo {self._fmt_interval(interval)}")
+            return
+        stamp = time.strftime("%H:%M:%S", time.localtime(snapshot.collected_at))
+        self._status_info.configure(text=f"Atualizado às {stamp} · coleta {fmt_num(snapshot.duration, 2)} s · "
+                                         f"intervalo {self._fmt_interval(interval)}")
+
+    def _render_overview_header(self) -> None:
+        names = self.manager.server_names
+        online = sum(1 for n in names if self._connections.get(n)
+                     and self._connections[n].state is ConnectionState.CONNECTED)
+        failing = sum(1 for n in names if self._server_health(n) is HealthLevel.CRITICAL)
+        text = f"{len(names)} servidor{'es' if len(names) != 1 else ''} · {online} online"
+        if failing:
+            text += f" · {failing} com problemas"
+        self._overview_label.configure(text=text, text_color=RED if failing else GRAY)
+        self._server_menu.configure(values=[OVERVIEW, *(self._menu_label(n) for n in names)])
+        self._server_menu.set(OVERVIEW if self._current is None else self._menu_label(self._current))
+
+    def _menu_label(self, server: str) -> str:
+        return f"{server}  ●" if self._server_health(server) is HealthLevel.CRITICAL else server
+
+    def _server_health(self, server: str) -> HealthLevel:
+        event = self._connections.get(server)
+        snapshot = self._snapshots.get(server)
+        if event is not None and event.state is ConnectionState.RECONNECTING:
+            return HealthLevel.CRITICAL
+        if snapshot is None:
+            return HealthLevel.UNKNOWN
+        if snapshot.failed_critical():
+            return HealthLevel.CRITICAL
+        if any(e.status is ServiceStatus.FAILED for e in snapshot.endpoints):
+            return HealthLevel.CRITICAL
+        if snapshot.smart is not None and any(d.status is ServiceStatus.FAILED for d in snapshot.smart.disks):
+            return HealthLevel.CRITICAL
+        counts = snapshot.counts()
+        security_fail = snapshot.security is not None and snapshot.security.count(CheckLevel.FAIL) > 0
+        if (counts[ServiceStatus.FAILED] or counts[ServiceStatus.DEGRADED] or snapshot.warnings
+                or snapshot.resource_alerts or snapshot.failing_endpoints() or security_fail):
+            return HealthLevel.WARNING
+        return HealthLevel.OK
+
+    def _update_tray(self) -> None:
+        if self._tray is None:
+            return
+        levels = {n: self._server_health(n) for n in self.manager.server_names}
+        overall = max(levels.values(), default=HealthLevel.UNKNOWN)
+        problems = []
+        for name, level in levels.items():
+            if level < HealthLevel.WARNING:
+                continue
+            event, snapshot = self._connections.get(name), self._snapshots.get(name)
+            if event is not None and event.state is ConnectionState.RECONNECTING:
+                problems.append(f"{name}: offline")
+            elif snapshot is not None:
+                failed = snapshot.counts()[ServiceStatus.FAILED]
+                problems.append(f"{name}: {failed} falha{'s' if failed != 1 else ''}" if failed else f"{name}: aviso")
+        self._tray.set_health(overall, APP_TITLE + ("\n" + "\n".join(problems) if problems else " — tudo OK"))
+
+    # -- loop de eventos ----------------------------------------------------------
+
+    def _pump(self) -> None:
+        try:
+            while True:
+                try:
+                    fn = self._ui_calls.get_nowait()
+                except queue.Empty:
+                    break
+                fn()
+                if self._quitting:
+                    return
+            dirty: set[str] = set()
+            alerts: list[ServiceAlertEvent] = []
+            for _ in range(self.MAX_EVENTS_PER_TICK):
+                try:
+                    event = self.manager.events.get_nowait()
+                except queue.Empty:
+                    break
+                self._handle_event(event, dirty, alerts)
+            if alerts:
+                self._dispatch_alerts(alerts)
+            if dirty:
+                self._update_tray()
+                if self._current is None or self._current in dirty:
+                    self._render_all()
+                else:
+                    self._render_overview_header()
+        except Exception:  # noqa: BLE001 - a bomba de eventos não pode parar
+            log.exception("Erro processando eventos da UI")
+        finally:
+            if not self._quitting:
+                self.after(self.UI_POLL_MS, self._pump)
+
+    def _handle_event(self, event: MonitorEvent, dirty: set[str], alerts: list[ServiceAlertEvent]) -> None:
+        server = event.server
+        if server not in self.manager.monitors:
+            return  # servidor removido em "Servidores e conexões" (evento que já estava na fila)
+        if isinstance(event, SnapshotEvent):
+            self._snapshots[server] = event.snapshot
+            dirty.add(server)
+        elif isinstance(event, ConnectionEvent):
+            previous = self._connections.get(server)
+            self._connections[server] = event
+            self._notify_connection_change(server, previous, event)
+            if event.needs:
+                self._on_connection_needs(server, event)
+            dirty.add(server)
+        elif isinstance(event, ServiceAlertEvent):
+            alerts.append(event)
+        elif isinstance(event, ThresholdAlertEvent):
+            self._notify_threshold(event)
+        elif isinstance(event, HostAlertEvent):
+            self._notify_host_alert(event)
+            dirty.add(server)
+        elif isinstance(event, ActionResultEvent):
+            self._busy.pop(f"{server}|{event.busy_key}", None)
+            self._on_action_result(event)
+            dirty.add(server)
+        elif isinstance(event, ChangeProgressEvent):
+            self._on_change_progress(event)
+            if event.finished:
+                dirty.add(server)
+
+    def _on_action_result(self, event: ActionResultEvent) -> None:
+        result = event.result
+        level = "error" if result.outcome is ActionOutcome.ERROR else "info"
+        self.log_windows_event(f"[{event.server}] Ação '{event.action_label}' em {event.target}: "
+                               f"{result.outcome.value} — {result.message}", level, "action")
+        if result.outcome is ActionOutcome.ERROR:
+            self.set_status(f"[{event.server}] {result.message}", error=True)
+            if self.winfo_viewable():
+                # Agendado: o diálogo é modal e não pode bloquear a bomba de eventos.
+                self.after(0, lambda: ConfirmDialog(
+                    self, title=f"Falha: {event.action_label} {event.target}", message=result.message,
+                    confirm_text="OK", cancel_text=None).show())
+            else:
+                self._notifier.notify(f"Falha: {event.action_label} {event.target}", result.message)
+        else:
+            self.set_status(f"[{event.server}] {result.message}", warning=result.outcome is ActionOutcome.PENDING)
+
+    def _notify_connection_change(self, server: str, previous: ConnectionEvent | None,
+                                  event: ConnectionEvent) -> None:
+        settings = self.settings.notifications
+        if event.state is ConnectionState.RECONNECTING:
+            if server not in self._offline_notified:
+                self._offline_notified.add(server)
+                self.log_windows_event(f"[{server}] Sem conexão SSH: {event.message}", "error", "connection_lost")
+                self._flash(True)
+                if settings.notify_on_disconnect:
+                    title = ("Conexão perdida" if previous and previous.state is ConnectionState.CONNECTED
+                             else "Servidor inacessível")
+                    self._notifier.notify(f"{title}: {server}", event.message or "Sem resposta via SSH.",
+                                          key=f"{server}:connection")
+        elif event.state is ConnectionState.CONNECTED and server in self._offline_notified:
+            self._offline_notified.discard(server)
+            self.log_windows_event(f"[{server}] Conexão SSH restabelecida.", "info", "connection_restored")
+            if settings.notify_on_disconnect and settings.notify_on_recovery:
+                self._notifier.notify(f"Conexão restabelecida: {server}", event.message,
+                                      key=f"{server}:connection-restored")
+
+    def _notify_threshold(self, event: ThresholdAlertEvent) -> None:
+        value = f"{fmt_num(event.value, 0)}{event.unit}"
+        limit = f"{fmt_num(event.threshold, 0)}{event.unit}"
+        if event.recovered:
+            self.log_windows_event(f"[{event.server}] {event.label} normalizado: {value}.", "info", "threshold")
+            if self.settings.notifications.notify_on_recovery:
+                self._notifier.notify(f"{event.label} normalizado — {event.server}", f"Agora em {value}.",
+                                      key=f"{event.server}:{event.metric}:ok")
+            return
+        log.warning("[%s] limite excedido: %s %s", event.server, event.label, value)
+        self.log_windows_event(f"[{event.server}] {event.label} em {value} (limite {limit}).", "warning", "threshold")
+        self._notifier.notify(f"{event.label} em {value} — {event.server}",
+                              f"Acima do limite configurado de {limit}.",
+                              key=f"{event.server}:{event.metric}")
+        self.set_status(f"[{event.server}] {event.label} em {value} (limite {limit})", warning=True)
+
+    def _notify_host_alert(self, event: HostAlertEvent) -> None:
+        level = "info" if event.recovered else event.level
+        log.log(logging.INFO if event.recovered else logging.WARNING, "[%s] %s: %s", event.server, event.title,
+                event.message)
+        self.log_windows_event(f"[{event.server}] {event.title} — {event.message}", level, event.category)
+        self._notifier.notify(event.title, event.message, key=event.key)
+        if not event.recovered:
+            self.set_status(f"[{event.server}] {event.title}", error=event.level == "critical",
+                            warning=event.level != "critical")
+            self._flash(event.level == "critical")
+
+    def _dispatch_alerts(self, alerts: list[ServiceAlertEvent]) -> None:
+        groups: dict[tuple[str, AlertKind], list[ServiceAlertEvent]] = defaultdict(list)
+        for alert in alerts:
+            groups[(alert.server, alert.alert)].append(alert)
+        verbs = {AlertKind.FAILED: "falhou", AlertKind.STOPPED: "parou", AlertKind.RECOVERED: "recuperado"}
+        for (server, kind), items in groups.items():
+            names = [a.service.name for a in items]
+            log.warning("[%s] alerta %s: %s", server, kind.value, ", ".join(names))
+            self.log_windows_event(f"[{server}] {', '.join(names)}: {verbs[kind]}",
+                                   "info" if kind is AlertKind.RECOVERED else "error",
+                                   "service_recovered" if kind is AlertKind.RECOVERED else "service_failed")
+            self._flash(kind is AlertKind.FAILED)
+            if len(items) > 3:
+                plural = {AlertKind.FAILED: "falharam", AlertKind.STOPPED: "pararam",
+                          AlertKind.RECOVERED: "se recuperaram"}[kind]
+                shown = ", ".join(names[:5]) + ("…" if len(names) > 5 else "")
+                self._notifier.notify(f"{len(items)} itens {plural} em {server}", shown,
+                                      key=f"{server}:{kind.value}:batch")
+            else:
+                for alert in items:
+                    service = alert.service
+                    self._notifier.notify(f"{service.name} {verbs[kind]}",
+                                          f"{server} · {service.type_label} · {service.state_text}",
+                                          key=f"{server}:{service.key}:{kind.value}")
+            if kind is not AlertKind.RECOVERED:
+                self.set_status(f"[{server}] {', '.join(names)} "
+                                f"{verbs[kind] if len(names) == 1 else 'com problema'}",
+                                error=kind is AlertKind.FAILED)
+
+    def _tick(self) -> None:
+        """Atualizações por segundo: contagem regressiva de reconexão."""
+        try:
+            self._render_connection()
+        finally:
+            if not self._quitting:
+                self.after(1000, self._tick)
+
+    # -- handlers -------------------------------------------------------------------
+
+    def _on_server_menu(self, label: str) -> None:
+        self.select_server(None if label == OVERVIEW else label.replace("●", "").strip())
+
+    def _on_interval_selected(self, label: str) -> None:
+        seconds = float(label.split()[0].replace(",", "."))
+        self.manager.set_poll_interval(seconds)
+        self.set_status(f"Intervalo de coleta alterado para {label}.")
+        if self._current is not None:
+            self._render_status_info(self._snapshots.get(self._current))
+
+    def _focus_search(self) -> None:
+        if self._current is not None:
+            tab = self._tabs.get(self._tabview.get())
+            if tab is not None:
+                tab.focus_search()
+
+    def _on_alerts_switch(self) -> None:
+        self.set_muted(not bool(self._alerts_switch.get()))
+
+    def _on_close(self) -> None:
+        if self.can_hide_to_tray and self.settings.minimize_to_tray:
+            self.hide_to_tray()
+        else:
+            self.quit_app()
+
+    def _report_callback_exception(self, exc_type, exc, tb) -> None:
+        log.error("Erro não tratado na UI", exc_info=(exc_type, exc, tb))
+        self.set_status(f"Erro interno: {exc}", error=True)
+
+    @staticmethod
+    def _fmt_interval(seconds: float) -> str:
+        return f"{int(seconds)} s" if float(seconds).is_integer() else f"{fmt_num(seconds)} s"
+
+
+def _set_enabled(widget: ctk.CTkButton, enabled: bool) -> None:
+    widget.configure(state="normal" if enabled else "disabled")

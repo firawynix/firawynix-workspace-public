@@ -1,0 +1,49 @@
+# Dependencies and generated build output
+node_modules/
+**/node_modules/
+.browser_modules/
+**/lib/
+dist/
+dist-*/
+electron-app/src-gen/
+browser-app/src-gen/
+electron-app/resources/runtime/
+build/llama-runtime-staging/
+
+# Generated/local runtime assets
+plugins/*
+!plugins/strigoi.astra-theme/
+!plugins/strigoi.astra-theme/**
+models/
+.strigoi/
+.tmp-*/
+.tmp-*
+.tmp-*.zip
+design/qa/**/config/
+design/qa/**/electron-*/
+design/qa/**/results/
+work/
+
+# Private project documentation and planning artifacts
+docs/
+
+# Logs, local settings and credentials
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.secret
+*credentials*.json
+*secrets*.json
+*.code-workspace
+
+# OS/editor metadata
+.DS_Store
+Thumbs.db
+.vscode/*.local.json

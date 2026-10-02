@@ -1,0 +1,17 @@
+node_modules/
+release/
+*.log
+shell/build/
+shell/package/FirawExplorerCommand.dll
+site/public/downloads/
+site/apply-catalog.sh
+site/ensure-cloudflare.cjs
+site/inspect-cloudflare.cjs
+site/update-cloudflared.py
+tools/write-portfolio-release.cjs
+.env
+.env.*
+*.pfx
+*.p12
+*.pem
+*.key

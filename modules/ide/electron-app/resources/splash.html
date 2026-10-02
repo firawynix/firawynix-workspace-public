@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark">
+  <title>Firawynix Workspace</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 24%, rgba(82, 228, 238, .18), transparent 42%),
+        #081a24;
+      color: #f8f8f2;
+      font-family: Inter, "Segoe UI", sans-serif;
+    }
+    main { text-align: center; transform: translateY(-4px); }
+    .mark {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 18px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(82, 228, 238, .55);
+      border-radius: 22px;
+      background: linear-gradient(145deg, #133746, #081a24);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .42), inset 0 1px rgba(255, 255, 255, .05);
+      overflow: hidden;
+    }
+    .mark img {
+      display: block;
+      width: 92%;
+      height: 92%;
+      object-fit: contain;
+    }
+    h1 { margin: 0; letter-spacing: .22em; font-size: 26px; font-weight: 650; }
+    p { margin: 10px 0 0; color: #52e4ee; font-size: 12px; letter-spacing: .13em; text-transform: uppercase; }
+    .bar { width: 180px; height: 2px; margin: 24px auto 0; overflow: hidden; background: #44475a; }
+    .bar::after {
+      content: "";
+      display: block;
+      width: 45%;
+      height: 100%;
+      background: linear-gradient(90deg, #127488, #52e4ee);
+      animation: load 1.25s ease-in-out infinite;
+    }
+    @keyframes load { from { transform: translateX(-110%); } to { transform: translateX(330%); } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark">
+      <img src="strigoi-icon.png" alt="Firawynix Workspace">
+    </div>
+    <h1>FIRAWYNIX WORKSPACE</h1>
+    <p>IDE local</p>
+    <div class="bar" aria-hidden="true"></div>
+  </main>
+</body>
+</html>

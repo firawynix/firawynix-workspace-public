@@ -1,0 +1,4 @@
+LIBRARY FirawExplorerCommand
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

@@ -1,0 +1,86 @@
+{
+  "name": "firawmerge",
+  "productName": "FirawMerge",
+  "version": "0.3.0",
+  "description": "Comparação, merge e revisão compartilhável de arquivos e ambientes",
+  "author": "Firawynix",
+  "license": "MIT",
+  "private": true,
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "smoke": "electron tools/smoke.cjs",
+    "smoke:viewer": "electron tools/viewer-smoke.cjs",
+    "dist:x64": "electron-builder --win portable --x64",
+    "dist:x86": "electron-builder --win portable --ia32",
+    "dist:all": "electron-builder --win portable --x64 --ia32",
+    "dist:install": "electron-builder --win nsis --x64 --ia32",
+    "dist:online": "electron-builder --win nsis-web --x64 --ia32",
+    "dist:store": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-store.ps1",
+    "mock:release": "node tools/prepare-mock-release.cjs"
+  },
+  "dependencies": {
+    "diff": "^9.0.0",
+    "electron-updater": "^6.7.3"
+  },
+  "devDependencies": {
+    "electron": "43.7.5",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "br.com.firawynix.merge",
+    "productName": "FirawMerge",
+    "copyright": "Firawynix",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "LICENSE",
+      "node_modules/diff/**/*"
+    ],
+    "extraFiles": [
+      { "from": "shell/build/FirawExplorerCommand.dll", "to": "FirawExplorerCommand.dll" },
+      { "from": "shell/build/x86/FirawExplorerCommand.dll", "to": "support/x86/FirawExplorerCommand.dll" },
+      { "from": "shell/package/Assets", "to": "Assets" },
+      { "from": "shell/build/FirawMerge.Context.msix", "to": "support/FirawMerge.Context.msix" },
+      { "from": "shell/build/FirawMergeContext.cer", "to": "support/FirawMergeContext.cer" },
+      { "from": "installer/register.ps1", "to": "support/register.ps1" },
+      { "from": "installer/unregister.ps1", "to": "support/unregister.ps1" }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "artifactName": "FirawMerge-${version}-${arch}.${ext}",
+      "signtoolOptions": {
+        "certificateSha1": "668BEF56480FCA8EB1B0BC3B102A6A9CEC554CC4",
+        "signingHashAlgorithms": ["sha256"],
+        "publisherName": "Firawynix"
+      },
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "buildUniversalInstaller": true,
+      "artifactName": "FirawMerge-${version}-Setup.${ext}",
+      "include": "installer/hooks.nsh"
+    },
+    "nsisWeb": {
+      "appPackageUrl": "https://firawmerge.firawynix.com.br/downloads/",
+      "artifactName": "FirawMerge-${version}-Online-Setup.${ext}"
+    },
+    "publish": [{ "provider": "generic", "url": "https://firawmerge.firawynix.com.br/downloads/" }]
+  }
+}

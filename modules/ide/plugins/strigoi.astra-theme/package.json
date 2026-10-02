@@ -1,0 +1,11 @@
+{
+  "name": "astra-theme",
+  "displayName": "Firawynix Cyan",
+  "publisher": "strigoi",
+  "version": "1.0.0",
+  "engines": { "vscode": "^1.70.0" },
+  "categories": ["Themes"],
+  "contributes": {
+    "themes": [{ "id": "Firawynix Cyan", "label": "Firawynix Cyan", "uiTheme": "vs-dark", "path": "./astra-color-theme.json" }]
+  }
+}

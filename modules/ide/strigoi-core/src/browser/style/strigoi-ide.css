@@ -1,0 +1,301 @@
+/* Astra IDE. Scoped so the Home keeps its own composition. */
+.strigoi-ide-titlebar, .strigoi-ide-agent-header, .strigoi-ide-work-summary,
+.strigoi-ide-context, .strigoi-ide-empty, .strigoi-ide-reviewbar, .strigoi-ide-welcome, .strigoi-ide-reasoning-slot { display: none; }
+
+#theia-app-shell.strigoi-ide-shell {
+    --theia-private-sidebar-tab-width: 56px;
+    --theia-editor-background: #080e1b;
+    --theia-editor-foreground: #d5dbea;
+    --theia-editorWidget-background: #101827;
+    --theia-sideBar-background: #090f1c;
+    --theia-sideBar-foreground: #bcc6d8;
+    --theia-sideBar-border: #263044;
+    --theia-sideBarSectionHeader-background: #0c1422;
+    --theia-sideBarSectionHeader-border: #202b3e;
+    --theia-sideBarSectionHeader-foreground: #bbc5d7;
+    --theia-activityBar-background: #080e1a;
+    --theia-activityBar-foreground: #d0d9eb;
+    --theia-activityBar-inactiveForeground: #78869e;
+    --theia-panel-background: #080e1b;
+    --theia-panel-border: #263044;
+    --theia-panelTitle-activeForeground: #d9fbff;
+    --theia-panelTitle-activeBorder: #52e4ee;
+    --theia-panelTitle-inactiveForeground: #929fb7;
+    --theia-tab-activeBackground: #101a2b;
+    --theia-tab-inactiveBackground: #080f1c;
+    --theia-tab-activeForeground: #f0ecff;
+    --theia-tab-inactiveForeground: #8f9bb1;
+    --theia-tab-border: #273147;
+    --theia-tab-activeBorder: #52e4ee;
+    --theia-tab-activeBorderTop: #52e4ee;
+    --theia-editorGroupHeader-tabsBackground: #080e19;
+    --theia-titleBar-activeBackground: #080e19;
+    --theia-titleBar-inactiveBackground: #080e19;
+    --theia-statusBar-background: #0a1120;
+    --theia-statusBar-noFolderBackground: #0a1120;
+    --theia-statusBar-debuggingBackground: #141c32;
+    --theia-statusBar-foreground: #aebbd0;
+    --theia-input-background: #0b1423;
+    --theia-input-foreground: #dde4f2;
+    --theia-input-border: #303b52;
+    --theia-dropdown-background: #0d1728;
+    --theia-dropdown-border: #303b52;
+    --theia-button-background: #127488;
+    --theia-button-hoverBackground: #159ab0;
+    --theia-button-foreground: #f5f0ff;
+    --theia-focusBorder: #52e4ee;
+    --theia-list-activeSelectionBackground: #26253e;
+    --theia-list-activeSelectionForeground: #eee8ff;
+    --theia-list-inactiveSelectionBackground: #202239;
+    --theia-list-hoverBackground: #151e30;
+    --theia-widget-border: #29334a;
+    --theia-widget-shadow: #00000044;
+    --theia-breadcrumb-background: #0b1220;
+    --theia-breadcrumb-foreground: #8494ae;
+    --theia-scrollbarSlider-background: #53617b55;
+    --theia-scrollbarSlider-hoverBackground: #788bab77;
+    --theia-statusBar-height: 32px;
+    color: #cbd5e6;
+    background: #070d18;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.strigoi-ide-shell #theia-top-panel {
+    position: relative;
+    min-height: 58px;
+    max-height: 58px;
+    background: linear-gradient(115deg, #0b1120, #060d19 60%, #101326) !important;
+    border-bottom: 1px solid #2b3348;
+}
+.strigoi-ide-shell #theia-custom-title { display: none !important; }
+.strigoi-ide-shell #window-controls { height: 58px; background: transparent; -webkit-app-region: no-drag; }
+.strigoi-ide-shell #theia\:menubar {
+    display: none !important;
+}
+.strigoi-ide-shell .strigoi-ide-titlebar {
+    display: flex; position: absolute; inset: 0 144px 0 0;
+    align-items: center; gap: 24px; padding: 0 18px;
+    -webkit-app-region: drag;
+}
+.strigoi-ide-brand { flex: 0 0 195px; font-size: 22px; font-weight: 650; letter-spacing: .2px; display: flex; align-items: center; gap: 12px; color: #f0edff; }
+.strigoi-ide-brand::before { content: ''; width: 34px; height: 40px; background: none center/contain no-repeat; }
+.strigoi-ide-menu { margin-left: auto; }
+.strigoi-ide-button {
+    border: 1px solid #34415a; border-radius: 6px; background: #0e1829; color: #d6ddef;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 7px 12px; min-height: 32px; font: inherit; font-size: 12px;
+    cursor: pointer; -webkit-app-region: no-drag; transition: background .12s, border-color .12s;
+}
+.strigoi-ide-button:hover { background: #22283d; border-color: #52e4ee; }
+.strigoi-ide-button:focus-visible { outline: 2px solid #8df4f7; outline-offset: 2px; }
+.strigoi-ide-button.primary { background: linear-gradient(100deg, #127488, #159ab0); color: #fff; border-color: #52e4ee; }
+.strigoi-ide-button.primary:hover { background: #159ab0; }
+.strigoi-ide-button.icon-only { padding: 5px; width: 28px; min-height: 28px; border-color: transparent; background: transparent; }
+.strigoi-ide-search { flex: 1; max-width: 620px; min-width: 140px; justify-content: flex-start; color: #94a1b9; background: #080f1c; margin: auto; height: 34px; }
+.strigoi-ide-search kbd { margin-left: auto; white-space: nowrap; border: 1px solid #2f3a4e; border-radius: 3px; padding: 1px 5px; font: 11px 'Segoe UI', sans-serif; }
+.strigoi-ide-title-actions { display: flex; gap: 8px; }
+.strigoi-ide-title-actions .strigoi-ide-button:first-child { border-color: #52e4ee; color: #aaf8fa; }
+
+.strigoi-ide-shell #theia-left-side-panel, .strigoi-ide-shell #theia-right-side-panel { background: #090f1c !important; }
+.strigoi-ide-shell .theia-app-sidebar { background: linear-gradient(180deg,#0e1422,#080e1a) !important; }
+.strigoi-ide-shell #theia-left-content-panel > .theia-app-sidebar-container { min-width: 56px; max-width: 56px; }
+.strigoi-ide-shell [id^='shell-tab-strigoi-home-sessions'] { display: none !important; }
+.strigoi-ide-shell .theia-app-sidebar .lm-TabBar-tab { color: #8290a7; }
+.strigoi-ide-shell .theia-app-sidebar .lm-TabBar-tab.lm-mod-current { color: #dbd9ee; background: #163d4b; border-radius: 6px; }
+.strigoi-ide-shell .theia-app-sidebar .lm-TabBar-tabIcon { font-size: 23px; }
+.strigoi-ide-shell .theia-sidepanel-toolbar { background: #0b1322; border-bottom: 1px solid #263044; min-height: 38px; }
+.strigoi-ide-shell .theia-sidepanel-title { font-size: 11px; letter-spacing: 1px; color: #a3afc5; }
+.strigoi-ide-shell .theia-TreeNode { min-height: 28px; line-height: 28px; }
+.strigoi-ide-shell .theia-TreeNode.theia-mod-selected { background: #163d4b; border-radius: 4px; }
+.strigoi-ide-shell .theia-TreeNode:hover:not(.theia-mod-selected) { background: #141d2e; }
+.strigoi-ide-shell .theia-TreeNode .theia-TreeNodeSegment { font-size: 13px; }
+.strigoi-ide-shell .theia-view-container-part-title { min-height: 28px; background: #0c1422; border-bottom: 1px solid #1b263a; }
+.strigoi-ide-shell .lm-DockPanel-tabBar { min-height: 38px; background: #080e1b; border-bottom: 1px solid #283348; }
+.strigoi-ide-shell .lm-DockPanel-tabBar .lm-TabBar-tab { min-height: 37px; padding: 0 14px; border-right: 1px solid #273249; font-size: 13px; }
+.strigoi-ide-shell .lm-DockPanel-tabBar .lm-mod-current { background: #111a2b; box-shadow: inset 0 2px #52e4ee; }
+.strigoi-ide-shell .lm-SplitPanel-handle { background: #243045; opacity: .8; }
+.strigoi-ide-shell .lm-SplitPanel-handle:hover { background: #52e4ee; }
+.strigoi-ide-shell .theia-editor, .strigoi-ide-shell .monaco-editor,
+.strigoi-ide-shell .monaco-editor .margin, .strigoi-ide-shell .monaco-editor .monaco-editor-background { background-color: #080e1b !important; }
+.strigoi-ide-shell .monaco-editor .current-line { border-color: #1a263b !important; }
+.strigoi-ide-shell .monaco-editor .line-numbers { color: #687c98; }
+.strigoi-ide-shell .monaco-editor .line-numbers.active-line-number { color: #d9fbff; }
+.strigoi-ide-shell .theia-breadcrumbs { background: #0b1220; color: #8e9bb1; border-bottom: 1px solid #1b2639; }
+.strigoi-ide-shell #theia-bottom-content-panel { border-top: 1px solid #2c3850; background: #080e1b; }
+.strigoi-ide-shell #theia-statusBar { min-height: 32px; border-top: 1px solid #2d354b; background: #0b1220 !important; font-size: 12px; }
+.strigoi-ide-shell #theia-statusBar .element { padding: 0 11px; }
+.strigoi-ide-shell #status-bar-strigoi-agent-status { color: #74d6a2 !important; }
+.strigoi-ide-shell #status-bar-strigoi-local-ai-status { color: #aaf8fa !important; border-left: 1px solid #2b3447; }
+.strigoi-ide-shell #status-bar-strigoi-local-ai-release-memory { color: #9faec6 !important; }
+
+/* Agent column: real chat, native tools and a single compact composer. */
+.strigoi-ide-shell .chat-view-widget { padding: 0 !important; background: #0a1120 !important; min-width: 0; container-type: inline-size; }
+.strigoi-ide-shell .strigoi-ide-agent-header { display: block; flex: 0 0 auto; padding: 10px 14px 12px; border-bottom: 1px solid #273248; }
+.strigoi-ide-agent-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.strigoi-ide-agent-title strong { color: #eee9fb; font-size: 17px; font-weight: 550; }
+.strigoi-ide-agent-state { color: #92a2b9; font-size: 11px; margin-right: auto; }
+.strigoi-ide-agent-state::before { content: ''; display: inline-block; border-radius: 50%; width: 6px; height: 6px; background: #71cba0; margin-right: 6px; }
+.strigoi-ide-modes { display: flex; padding: 3px; gap: 3px; border: 1px solid #354058; border-radius: 7px; background: #080f1b; }
+.strigoi-ide-modes button { flex: 1; border: 0; min-height: 28px; padding: 3px; background: transparent; color: #a4b0c6; }
+.strigoi-ide-modes button[aria-pressed='true'] { color: #ece4ff; background: linear-gradient(110deg,#164758,#155569); box-shadow: inset 0 0 0 1px #52e4ee; }
+.strigoi-ide-shell .chat-tree-view-widget { min-height: 80px; min-width: 0; margin: 0 !important; padding: 0 10px; background: transparent !important; }
+.strigoi-ide-shell .chat-tree-view-widget .theia-TreeContainer { background: transparent !important; }
+.strigoi-ide-shell .theia-ChatNode { padding: 14px 14px 10px; margin: 12px 0; border: 1px solid #202d42; border-radius: 10px; background: #0f1828; line-height: 1.6; font-size: 13px; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-RequestNode) { position: relative; margin-left: 30px; background: linear-gradient(120deg,#133442,#102d3b); border-color: #276779; padding: 12px 32px 12px 14px; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-RequestNode) > .theia-ChatNodeHeader { position: absolute; top: 7px; right: 5px; margin: 0; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-RequestNode) > .theia-ChatNodeHeader > .theia-AgentAvatar,
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-RequestNode) > .theia-ChatNodeHeader > .theia-AgentLabel { display: none; }
+.strigoi-ide-shell .theia-RequestNode { margin: 0; background: transparent; }
+.strigoi-ide-shell .theia-RequestNode p { margin: 0; }
+.strigoi-ide-shell .theia-ChatNodeHeader { margin-bottom: 8px; }
+.strigoi-ide-shell .theia-ChatNodeHeader .theia-PromptVariantBadge,
+.strigoi-ide-shell .theia-ChatNodeHeader .theia-ModelBadge { display: none; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-ResponseNode) .theia-AgentAvatar { background: none center/contain no-repeat; width: 26px; height: 28px; flex-shrink: 0; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-ResponseNode) .theia-AgentAvatar::before { visibility: hidden; }
+.strigoi-ide-shell .theia-ChatNode pre { background: #0a1020; border: 1px solid #28354b; border-radius: 6px; padding: 10px; overflow: auto; }
+.strigoi-ide-shell .theia-ChatNode .theia-CodeWrapper { border: 1px solid #2b354b; border-radius: 7px; overflow: hidden; }
+.strigoi-ide-shell .theia-WelcomeMessage-SessionsSection { display: none !important; }
+.strigoi-ide-shell .theia-WelcomeMessage-Logo { display: none; }
+.strigoi-ide-shell .theia-WelcomeMessage:not(:has(.theia-WelcomeMessage-Actions)):not(:has(.theia-WelcomeMessage-Alert)),
+.strigoi-ide-shell .theia-WelcomeMessage:not(:has(.theia-WelcomeMessage-Actions)):not(.theia-WelcomeMessage-Disabled) > .theia-WelcomeMessage-Content,
+.strigoi-ide-shell .theia-WelcomeMessage-Divider { display: none; }
+.strigoi-ide-shell .theia-WelcomeMessage-Container-Inner:has(.theia-WelcomeMessage-Actions) .strigoi-ide-welcome { display: none; }
+.strigoi-ide-shell .strigoi-ide-welcome { display: flex; flex-direction: column; align-items: center; padding: 28px 22px; text-align: center; color: #9babc2; line-height: 1.7; }
+.strigoi-ide-welcome-avatar { display: block; width: 48px; height: 54px; margin-bottom: 12px; background: none center/contain no-repeat; }
+.strigoi-ide-welcome h2 { color: #e0d9f5; font-size: 18px; font-weight: 550; margin: 5px 0; }
+.strigoi-ide-welcome p { font-size: 13px; margin-bottom: 24px; }
+.strigoi-ide-welcome > div { font-size: 12px; padding: 6px 0; }
+.strigoi-ide-welcome .codicon { color: #52e4ee; margin-right: 7px; }
+.strigoi-ide-shell .strigoi-ide-work-summary:not([hidden]) { display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto; max-height: 32%; overflow-y: auto; padding: 0 14px 10px; }
+.strigoi-ide-plan-card, .strigoi-ide-changes-card { border: 1px solid #2b3950; border-radius: 8px; background: linear-gradient(125deg,#131f31,#0d1627); padding: 12px; }
+.strigoi-ide-plan-card strong, .strigoi-ide-changes-card strong { display: block; font-size: 12px; font-weight: 600; color: #e2e8f6; margin-bottom: 8px; }
+.strigoi-ide-plan-card p { font-size: 12px; color: #aab9cf; line-height: 1.5; margin: 6px 0; border-top: 1px solid #233047; padding-top: 6px; overflow-wrap: anywhere; }
+.strigoi-ide-plan-card .strigoi-ide-plan-completed { color: #83cda7; }
+.strigoi-ide-file-row { display: flex; width: 100%; justify-content: flex-start; border: none; background: #182337; margin: 3px 0; }
+.strigoi-ide-file-state { margin-left: auto; color: #77d3a5; font-size: 11px; }
+.strigoi-ide-changes-card > .primary { width: 100%; margin-top: 8px; }
+.strigoi-ide-shell .strigoi-ide-context { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; color: #97a8c1; padding: 9px 14px; border-block: 1px solid #293449; }
+.strigoi-ide-shell .strigoi-ide-reasoning-slot { display: flex; flex: 0 0 auto; padding: 9px 14px 0; }
+.strigoi-ide-shell .chat-input-widget { padding: 12px !important; margin: 0 !important; background: #0b1221; flex: 0 0 auto; min-width: 0; }
+.strigoi-ide-shell .theia-ChatInput { background: transparent; }
+.strigoi-ide-shell .theia-ChatInput-Editor-Box { border: 1px solid #3b4562; border-radius: 10px; padding: 12px 10px 8px; background: linear-gradient(135deg,#121b2d,#0c1423); }
+.strigoi-ide-shell .theia-ChatInput-Editor-Box:focus-within { border-color: #52e4ee; box-shadow: 0 0 0 1px #52e4ee22; }
+.strigoi-ide-shell .theia-ChatInput-Editor { min-height: 54px; }
+.strigoi-ide-shell .theia-ChatInput-Editor .monaco-editor,
+.strigoi-ide-shell .theia-ChatInput-Editor .monaco-editor-background,
+.strigoi-ide-shell .theia-ChatInput-Editor .margin { background: transparent !important; }
+.strigoi-ide-shell .theia-ChatInput-Editor-Placeholder { color: #8695ad; font-size: 12px; }
+.strigoi-ide-shell .theia-ChatInput[data-ai-disabled='false'] .theia-ChatInput-Editor-Placeholder:not(.hidden) { font-size: 0; }
+.strigoi-ide-shell .theia-ChatInput[data-ai-disabled='false'] .theia-ChatInput-Editor-Placeholder:not(.hidden)::before { content: 'Descreva a próxima alteração…'; font-size: 12px; }
+.strigoi-ide-shell .theia-ChatInputOptions { flex-wrap: wrap; gap: 7px; padding-top: 8px; }
+.strigoi-ide-shell .theia-ChatInputOptions-left { flex-wrap: wrap; flex: 1; gap: 5px !important; min-width: 0; }
+.strigoi-ide-shell .theia-ChatInputOptions-right { margin-left: auto; gap: 4px; }
+.strigoi-ide-shell .theia-ChatInputOptions .option { min-height: 28px; border-radius: 6px; }
+.strigoi-ide-shell .theia-ChatInputOptions .codicon-tools { border: 1px solid #3b415b; padding: 6px; }
+.strigoi-ide-shell .theia-ChatInputOptions .codicon-tools::after { content: 'Skills'; font-family: 'Segoe UI', sans-serif; font-size: 11px; margin-left: 6px; }
+
+.strigoi-salesforce-extension-card {
+    display: block;
+    box-sizing: border-box;
+    width: calc(100% - 16px);
+    min-width: 0;
+    margin: 6px 8px 8px;
+    padding: 10px;
+    border: 1px solid rgba(189, 147, 249, .36);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(25, 28, 48, .94), rgba(14, 17, 31, .94));
+    color: #f8f8f2;
+}
+
+.strigoi-salesforce-extension-card-heading {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    color: #d8c8ff;
+    font-size: 12px;
+    min-width: 0;
+}
+
+.strigoi-salesforce-extension-card-heading .codicon { color: #7dd3fc; }
+.strigoi-salesforce-extension-card-heading strong { min-width: 0; overflow-wrap: anywhere; }
+
+.strigoi-salesforce-extension-card p {
+    margin: 7px 0 9px;
+    color: #aeb8d4;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+}
+
+.strigoi-salesforce-extension-card footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.strigoi-salesforce-extension-badge,
+.strigoi-salesforce-extension-installed {
+    color: #74d6a2;
+    font-size: 10px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.strigoi-ide-shell .theia-TreeNode:has(.strigoi-salesforce-extension-card) {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: normal !important;
+    overflow: visible;
+}
+.strigoi-ide-shell .theia-ChatInputOptions-right .codicon-send { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#b388ed,#754ab0); color: white; }
+.strigoi-ide-shell .theia-ChatInput-ModelSelector { max-width: 165px; font-size: 11px; border: 1px solid #323c55; border-radius: 6px; padding: 5px; }
+.strigoi-ide-shell .theia-ChatInput-ModelSelector-container { margin-left: auto; }
+.strigoi-ide-shell .theia-ChatInputOptions .codicon-tools { border-radius: 6px; }
+.strigoi-ide-shell .theia-WelcomeMessage-Alert { background: #142438; border-color: #334960; color: #b6c7dc; border-radius: 8px; font-size: 12px; }
+.strigoi-ide-shell .strigoi-thinking-toggle { border: 0; background: transparent; color: #bea2e3; font-size: 11px; padding: 3px 0; }
+.strigoi-ide-shell .strigoi-thinking-toggle-track { width: 64px; background-size: 11px 100%; }
+.strigoi-ide-shell .strigoi-thinking-toggle-thumb { width: 8px; }
+.strigoi-ide-shell .strigoi-thinking-toggle.thinking-level-minimal .strigoi-thinking-toggle-thumb { transform: translateX(11px); }
+.strigoi-ide-shell .strigoi-thinking-toggle.thinking-level-low .strigoi-thinking-toggle-thumb { transform: translateX(22px); }
+.strigoi-ide-shell .strigoi-thinking-toggle.thinking-level-medium .strigoi-thinking-toggle-thumb { transform: translateX(33px); }
+.strigoi-ide-shell .strigoi-thinking-toggle.thinking-level-high .strigoi-thinking-toggle-thumb { transform: translateX(44px); }
+.strigoi-ide-shell .strigoi-thinking-toggle.thinking-level-auto .strigoi-thinking-toggle-thumb { transform: translateX(55px); }
+.strigoi-ide-shell .theia-ChatInput-ChangeSet-Box { display: none; }
+.strigoi-ide-shell .strigoi-companion, .strigoi-ide-shell .strigoi-empty-editor { display: none !important; }
+.strigoi-ide-shell .strigoi-ide-empty.visible { display: flex; position: absolute; inset: 0; flex-direction: column; justify-content: center; align-items: center; padding: 30px; text-align: center; }
+.strigoi-ide-empty::before { content: '✦'; color: #b795e8; font-size: 62px; margin-bottom: 20px; }
+.strigoi-ide-empty h1 { font-size: 24px; font-weight: 550; color: #ddd5f4; }
+.strigoi-ide-empty p { color: #91a2bc; line-height: 1.6; }
+.strigoi-ide-empty > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+.strigoi-ide-shell .strigoi-ide-reviewbar { display: flex; box-sizing: border-box; position: absolute; top: 0; left: 0; right: 0; height: 42px; padding: 0 12px; align-items: center; gap: 8px; background: #10192a; border-bottom: 1px solid #35415a; z-index: 5; }
+.strigoi-ide-reviewbar > span { margin-right: auto; font-size: 12px; color: #aebed7; }
+.strigoi-ide-shell .theia-editor.strigoi-has-review { padding-top: 42px; box-sizing: border-box; }
+
+@media (max-width: 1150px) {
+    .strigoi-ide-brand { flex-basis: 150px; }
+    .strigoi-ide-shell .strigoi-ide-titlebar { gap: 12px; }
+    .strigoi-ide-search { font-size: 0; }
+    .strigoi-ide-search .codicon { font-size: 16px; }
+    .strigoi-ide-search kbd { font-size: 11px; }
+    .strigoi-ide-shell #theia\:menubar { left: 145px; }
+}
+@media (max-height: 720px) {
+    .strigoi-ide-shell .strigoi-ide-work-summary:not([hidden]) { max-height: 23%; }
+    .strigoi-ide-shell .strigoi-ide-agent-header { padding: 6px 12px 8px; }
+    .strigoi-ide-agent-title { margin-bottom: 7px; }
+}
+
+/* Firawynix Workspace: cyan identity, without mascot imagery. */
+.strigoi-ide-brand::before, .strigoi-ide-welcome-avatar { display: none !important; }
+.strigoi-ide-brand { flex-basis: 245px; font-size: 19px; color: #d9fbff; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-ResponseNode) .theia-AgentAvatar { background: #123745; border: 1px solid #52e4ee; border-radius: 8px; }
+.strigoi-ide-shell .theia-ChatNode:has(> .theia-ResponseNode) .theia-AgentAvatar::before { visibility: visible; color: #52e4ee; }

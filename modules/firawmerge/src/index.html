@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; frame-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'">
+  <title>FirawMerge</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><img src="../assets/logo.svg" alt=""><div><strong>Firaw<span>Merge</span></strong><small>COMPARE · RESOLVA · COMPARTILHE</small></div></div>
+      <div class="top-center"><span class="pulse"></span><span>WORKSPACE LOCAL</span><i></i><span id="topMode">Nenhuma sessão aberta</span></div>
+      <div class="top-actions"><span class="version">v0.2.0</span><button id="openSession" class="button subtle">Abrir trabalho</button><button id="saveSession" class="button subtle" disabled>Salvar trabalho</button><button id="exportTop" class="button subtle" disabled>Exportar revisão ↗</button></div>
+    </header>
+    <div class="body">
+      <aside class="sidebar">
+        <section class="sidebar-top">
+          <div class="section-heading"><span>01 / ENTRADAS</span><span class="tiny-icon">◈</span></div>
+          <h1>Nova comparação</h1>
+          <p>Preencha quaisquer duas pastas. Com três, a Pasta 01 será a base do merge.</p>
+          <div class="segmented" role="group" aria-label="Tipo de comparação"><button id="modeFolder" class="active">▤ &nbsp; Pastas</button><button id="modeFile">▧ &nbsp; Arquivos</button></div>
+          <label class="format-field">MODO DE COMPARAÇÃO<select id="formatSelect"><option value="auto">Automático por arquivo</option><option value="text">Texto</option><option value="table">Tabela</option><option value="binary">Binário</option><option value="image">Imagem</option><option value="webpage">Página da Web</option></select></label>
+          <div id="folderOptions" class="folder-options"><label>Filtro de arquivos<input id="fileMask" value="*" placeholder="*.txt;*.csv"></label><label class="folder-check"><input id="includeSubfolders" type="checkbox" checked> Incluir subpastas</label></div>
+          <label class="source-field"><span><b class="marker base"></b><span id="baseLabel">Pasta 01</span> <em>base se houver 3</em></span><div><input id="basePath" readonly placeholder="Selecionar Pasta 01…"><button data-pick="base" title="Escolher Pasta 01">···</button></div></label>
+          <label class="source-field"><span><b class="marker origin"></b><span id="originLabel">Pasta 02</span></span><div><input id="originPath" readonly placeholder="Selecionar Pasta 02…"><button data-pick="origin" title="Escolher Pasta 02">···</button></div></label>
+          <label class="source-field"><span><b class="marker destination"></b><span id="destinationLabel">Pasta 03</span></span><div><input id="destinationPath" readonly placeholder="Selecionar Pasta 03…"><button data-pick="destination" title="Escolher Pasta 03">···</button></div></label>
+          <button id="compareBtn" class="button primary full"><span>Comparar ambientes</span><span>→</span></button>
+        </section>
+        <section class="file-section">
+          <div class="section-heading"><span>02 / ARQUIVOS</span><span id="fileCount">0</span></div>
+          <div class="file-search"><span>⌕</span><input id="fileSearch" placeholder="Filtrar arquivos…" aria-label="Filtrar arquivos"></div>
+          <label class="folder-check"><input id="hideEqualFiles" type="checkbox"> Ocultar arquivos iguais</label>
+          <div id="fileList" class="file-list"><div class="empty-list">Os arquivos da comparação aparecem aqui.</div></div>
+        </section>
+        <div class="sidebar-footer"><span class="cyan-dot"></span> OS ARQUIVOS PERMANECEM NESTE COMPUTADOR</div>
+      </aside>
+      <main class="main">
+        <div class="workspace-heading"><div><div class="eyebrow">WORKSPACE / COMPARAÇÃO</div><h2 id="workspaceTitle">Sua revisão começa aqui</h2><p id="workspaceSubtitle">Escolha as pastas ou arquivos na barra lateral.</p></div><div id="stats" class="stats"></div></div>
+        <div class="toolbar"><div class="toolbar-left"><span class="section-tab active">◫ &nbsp; Comparação</span><span id="activeFile" class="active-file">Nenhum arquivo selecionado</span></div><div class="toolbar-right"><label class="switch-label"><input id="hideEqual" type="checkbox"><span class="switch"></span>Ocultar linhas iguais</label><button id="saveBtn" class="button subtle" disabled>Salvar resultado</button></div></div>
+        <div id="diffArea" class="diff-area"><div class="hero-empty"><div class="hero-mark"><img src="../assets/logo.svg" alt=""></div><span>FIRAWMERGE WORKSPACE</span><h3>Uma visão clara de cada mudança.</h3><p>Compare duas versões ou use uma base comum para encontrar conflitos, aplicar escolhas e gerar uma revisão que abre em qualquer navegador.</p><div class="hero-steps"><span>01 &nbsp; SELECIONE</span><b>→</b><span>02 &nbsp; COMPARE</span><b>→</b><span>03 &nbsp; COMPARTILHE</span></div></div></div>
+        <div class="result-panel"><div class="result-head"><div><span class="section-heading">03 / RESULTADO</span><strong>Prévia do merge</strong><small id="resultState">Abra uma comparação para editar o resultado.</small></div><span id="lineCount" class="line-count">0 linhas</span></div><textarea id="resultText" spellcheck="false" placeholder="O resultado consolidado aparecerá aqui…" disabled></textarea><div id="assetResult" class="asset-result hidden"></div></div>
+        <div class="statusbar"><span id="statusText">Pronto para comparar</span><span>Firawynix · FirawMerge</span></div>
+      </main>
+      <aside class="inspector"><div class="section-heading"><span>PAINEL DE REVISÃO</span><span>✦</span></div><div class="inspector-card cyan-card"><div class="card-icon">✦</div><h3>Resolver conflitos com IA</h3><p>Use IA somente ao comparar duas entradas: origem e destino. As sugestões aparecem ao lado e vão para uma pasta nova.</p><div class="ai-row"><select id="modelSelect" aria-label="Modelo Ollama"><option value="">Buscar modelos…</option></select><button id="refreshModels" title="Atualizar modelos">↻</button></div><button id="aiSettings" class="button subtle full config-button">⚙ &nbsp; Configurar IA e hardware</button><button id="aiBtn" class="button ai-button full" disabled>✦ &nbsp; Resolver conflito</button><button id="aiBatchBtn" class="button outline full batch-button" disabled>✦ &nbsp; Resolver todas as diferenças</button><div id="batchPanel" class="batch-panel hidden"><progress id="batchProgress" max="100" value="0"></progress><div id="batchStatus" role="status">Preparando lote…</div><button id="aiBatchCancel" class="text-button">Cancelar lote</button><button id="openBatchFolder" class="text-button hidden">Abrir pasta de resultados ↗</button></div><small id="aiInfo">Nenhum conteúdo sai deste computador.</small><div id="aiResultInfo" class="ai-result-info"></div></div><div class="inspector-section"><div class="section-heading"><span>MUDANÇAS NESTE ARQUIVO</span><span id="hunkCount">0</span></div><div id="hunkList" class="hunk-list"><p class="muted">Abra um arquivo para ver suas alterações.</p></div></div><div class="inspector-card share-card"><div class="card-icon">↗</div><h3>Compartilhe a revisão</h3><p>Exporte um HTML interativo com as versões e o resultado. Basta abrir com duplo clique.</p><button id="exportSide" class="button outline full" disabled>Exportar HTML interativo ↗</button></div></aside>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <div id="aiModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle"><div class="modal"><div class="modal-head"><div><span class="eyebrow">IA LOCAL / AJUSTE DE RECURSOS</span><h2 id="aiModalTitle">Configurar resolução de conflitos</h2></div><button id="configClose" class="close-button" aria-label="Fechar">×</button></div><p class="modal-intro">O scan identifica o hardware e sugere um modelo para o orçamento escolhido. RAM e VRAM orientam a recomendação; o Ollama controla a alocação real.</p><div class="hardware-card"><div class="section-heading"><span>HARDWARE DETECTADO</span><button id="scanHardware" class="text-button">↻ &nbsp; Verificar agora</button></div><div id="hardwareInfo" class="hardware-info">Clique em “Verificar agora” para analisar este computador.</div></div><div class="budget-grid"><div class="budget"><label><span><input id="useRam" type="checkbox" checked disabled> RAM disponível</span><strong id="ramValue">8 GB</strong></label><input id="ramRange" type="range" min="2" max="64" value="8"></div><div class="budget"><label><span><input id="useGpu" type="checkbox" checked> Usar GPU</span><strong id="gpuValue">4 GB VRAM</strong></label><input id="gpuRange" type="range" min="0" max="24" value="4"></div><div class="budget"><label><span><input id="useCpu" type="checkbox" checked> Permitir CPU</span><strong id="cpuValue">8 threads</strong></label><input id="cpuRange" type="range" min="1" max="32" value="8"></div></div><div class="recommendation"><div><span class="eyebrow">MODELO RECOMENDADO PARA ESTE ORÇAMENTO</span><strong id="recommendedModel">Aguardando verificação</strong><p id="recommendReason">Defina as barras e verifique o hardware.</p></div><button id="installModel" class="button primary" disabled>Instalar modelo ↓</button></div><div class="install-progress"><span id="installStatus">O modelo é baixado pelo Ollama somente quando você clicar em instalar.</span><progress id="installProgress" max="100" value="0"></progress></div><p class="modal-footnote">A IA só analisa diferenças entre duas entradas. O resultado aparece ao lado e é salvo em uma pasta nova, com alertas para revisão; os originais não são alterados. A CPU ainda coordena o serviço quando o processamento principal ocorre na GPU.</p></div></div>
+  <script src="renderer.js"></script>
+</body>
+</html>
+
