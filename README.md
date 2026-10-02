@@ -10,7 +10,7 @@ Edição pública para Windows que reúne o Monitor, a Firawynix Workspace IDE e
 
 ## Compilação
 
-O Monitor usa Python 3.13 e `modules/monitor/scripts/build.ps1`. A IDE usa Node.js 22 e `npm run package:windows`. O FirawMerge usa Node.js e `npm run dist:x64`. O script `modules/monitor/scripts/package-workspace.ps1` monta um pacote portátil e um instalador tradicional. Para preparar o MSIX, use `packaging/store/build-msix.ps1` após compilar os três componentes.
+O Monitor usa Python 3.13 e `modules/monitor/scripts/build.ps1`. A IDE usa Node.js 22 e `npm run build` seguido de `npx electron-builder --win dir --x64`. O FirawMerge usa Node.js e `npx electron-builder --win portable --x64 --config packaging/workspace-portable.cjs`. O script `modules/monitor/scripts/package-workspace.ps1` monta um pacote portátil e um instalador tradicional. Para preparar o MSIX, use `packaging/store/build-msix.ps1` após compilar os três componentes.
 
 ## Dados privados
 
