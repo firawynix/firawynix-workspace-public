@@ -89,6 +89,16 @@ main { overflow: hidden; }
 .source-copy { padding-top: 12px; }
 .source-copy p { color: #b2ced8; }
 .source-links { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 28px; color: #5bdcee; font-size: 14px; font-weight: 700; }
+.editions { padding: 88px clamp(22px, 5vw, 78px); border-top: 1px solid #2c5266; background: #0b2231; }
+.editions > div:first-child { max-width: 1370px; margin: auto; }
+.editions h2 { margin: 16px 0; font-size: clamp(36px, 4.2vw, 60px); line-height: 1.09; letter-spacing: -.055em; }
+.editions > div:first-child > p:last-child { max-width: 700px; color: #a9c5d0; }
+.edition-grid { max-width: 1370px; margin: 32px auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.edition-grid a { min-height: 190px; padding: 24px; display: flex; flex-direction: column; gap: 13px; border: 1px solid #345a6e; border-radius: 15px; background: #123347; }
+.edition-grid a:hover { border-color: #5bd9ea; background: #174357; }
+.edition-grid strong { font-size: 20px; }
+.edition-grid span { color: #afc9d5; font-size: 13px; line-height: 1.5; }
+.edition-grid b { margin-top: auto; color: #69e3f2; font-size: 13px; }
 .final-cta { display: flex; justify-content: space-between; align-items: center; gap: 36px; padding: 85px clamp(22px, 5vw, 78px) 100px; }
 .final-cta h2 { max-width: 780px; margin-bottom: 0; }
 .final-cta .button { flex: none; }
@@ -97,9 +107,8 @@ main { overflow: hidden; }
 .footer-inner { max-width: 1300px; min-height: 78px; margin: auto; padding: 8px 24px; display: flex; justify-content: space-between; align-items: center; gap: 18px; }
 .footer-brand { color: #f2fbff; white-space: nowrap; font-size: 17px; font-weight: 800; letter-spacing: -.035em; }
 .footer-brand span { color: #65dcee; }
-.footer-credit { color: #8ca9b9; white-space: nowrap; font-size: 12px; }
-.fixed-footer nav { display: flex; align-items: center; gap: 5px; }
-.fixed-footer nav a { padding: 10px 12px; border-radius: 7px; color: #bdd6e1; white-space: nowrap; font-size: 12px; font-weight: 700; }
+.fixed-footer nav { display: flex; align-items: center; gap: 3px; }
+.fixed-footer nav a { padding: 10px 9px; border-radius: 7px; color: #bdd6e1; white-space: nowrap; font-size: 11px; font-weight: 700; }
 .fixed-footer nav a:hover { background: #17394b; color: #63e2f3; }
 .fixed-footer nav .footer-store { border: 1px solid #3b667b; background: #123346; color: #6ee7f6; }
 .fixed-footer nav .footer-support { background: linear-gradient(125deg, #2bcbe4, #71e8f9); color: #08222e; }
@@ -118,10 +127,11 @@ main { overflow: hidden; }
   .hero-copy { max-width: 760px; }
   .hero-visual { max-width: 850px; }
   .showcase-image { max-width: 900px; }
-  .footer-credit { display: none; }
+  .footer-inner { flex-wrap: wrap; justify-content: center; }
+  .fixed-footer nav { flex-wrap: wrap; justify-content: center; }
 }
 @media (max-width: 760px) {
-  body { padding-bottom: 118px; }
+  body { padding-bottom: 160px; }
   .site-header { height: 72px; }
   .header-nav { display: none; }
   .header-action { padding: 10px; font-size: 12px; }
@@ -135,18 +145,19 @@ main { overflow: hidden; }
   .quick-facts { grid-template-columns: 1fr; }
   .quick-facts > div { border-right: 0; border-bottom: 1px solid #294c5f; }
   .feature-grid { grid-template-columns: 1fr; }
+  .edition-grid { grid-template-columns: 1fr; }
   .features, .showcase { padding-block: 75px; }
   .source { grid-template-columns: 1fr; gap: 10px; padding-block: 75px; }
   .final-cta { flex-direction: column; align-items: flex-start; padding-block: 75px 95px; }
-  .footer-inner { min-height: 118px; flex-direction: column; justify-content: center; gap: 7px; padding: 9px 13px; }
+  .footer-inner { min-height: 160px; flex-direction: column; justify-content: center; gap: 7px; padding: 9px 13px; }
   .fixed-footer nav { justify-content: center; flex-wrap: wrap; }
   .fixed-footer nav a { padding: 6px 8px; font-size: 11px; }
 }
 @media (max-width: 420px) {
-  body { padding-bottom: 145px; }
+  body { padding-bottom: 190px; }
   .site-header { gap: 10px; }
   .header-action { max-width: 115px; text-align: center; }
   .hero-points { gap: 12px; }
   .visual-caption span { display: none; }
-  .footer-inner { min-height: 145px; }
+  .footer-inner { min-height: 190px; }
 }

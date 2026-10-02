@@ -8,6 +8,6 @@ Na raiz do repositório, execute:
 python -m http.server 4176 --bind 127.0.0.1 --directory site
 ```
 
-Depois abra <http://127.0.0.1:4176/>. A barra inferior permanece fixa e contém links para a Microsoft Store, o repositório público da conta FIRAWYNIX, a política de privacidade e o portfólio.
+Depois abra <http://127.0.0.1:4176/>. A barra inferior permanece fixa e contém os links da Microsoft Store para o Workspace, o Monitor e a IDE, além do repositório público da conta FIRAWYNIX, da política de privacidade e do portfólio.
 
-O link da Store usa o Store ID reservado `9NHPH2BRCXML`; a página pública pode ficar indisponível enquanto o aplicativo estiver em certificação. As imagens mostram dados simulados e uma comparação local de exemplo.
+Os links da Store usam os IDs reservados `9NHPH2BRCXML` (Workspace), `9P60P0V66PN8` (Monitor) e `9N968W52SJKR` (IDE). As páginas públicas podem ficar indisponíveis enquanto os aplicativos estiverem em certificação. As imagens mostram dados simulados e uma comparação local de exemplo.
