@@ -15,3 +15,5 @@ O Monitor usa Python 3.13 e `modules/monitor/scripts/build.ps1`. A IDE usa Node.
 ## Dados privados
 
 Configurações locais, senhas, chaves, bancos, logs e artefatos compilados não são versionados. O exemplo de servidores está vazio. O histórico deste repositório começa nesta edição pública.
+
+A [política de privacidade](privacy-policy.md) descreve os dados locais e os recursos opcionais de rede desta edição.
