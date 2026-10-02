@@ -1,4 +1,6 @@
-# strigoi — rascunho da Microsoft Store
+# strigoi — envio à Microsoft Store
+
+Enviado para certificação em 2 de outubro de 2026. O Partner Center confirmou “Em certificação” e publicação automática após aprovação.
 
 Store ID: `9P7MM0HKX86L`  
 Link: <https://apps.microsoft.com/detail/9P7MM0HKX86L>  
@@ -19,7 +21,7 @@ Você escolhe os projetos que abre e as alterações que aplica. O download de m
 - IA local opcional com seleção de modelo compatível.
 - Interface em português brasileiro e inglês.
 
-**Imagens para Desktop:** `../assets/strigoi-home.jpg` e `../assets/strigoi-ide.png` (a partir de `packaging/store/standalone`). Capturas originais da versão 0.1.17, com telas Home e IDE. Legendas: “Strigoi Home com modelo local offline.” e “Strigoi IDE com projeto de demonstração e revisão de alterações.”
+**Imagens para Desktop:** `../assets/strigoi-home.png` e `../assets/strigoi-ide.png` (a partir de `packaging/store/standalone`). Capturas originais da versão 0.1.17, com telas Home e IDE. A captura Home foi convertida de JPEG para PNG, formato exigido pelo Partner Center, sem alterar a imagem. Legendas: “Strigoi Home com modelo local offline.” e “Strigoi IDE com projeto de demonstração e revisão de alterações.”
 
 ## English (United States)
 
